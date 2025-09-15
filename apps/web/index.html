@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StoryScope - POC</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            margin: 24px;
+            max-width: 900px;
+        }
+
+        h1 {
+            margin: 0 0 16px;
+        }
+
+        .card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin: 8px 0 4px;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+        }
+
+        textarea {
+            min-height: 120px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: 0;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .muted {
+            color: #666;
+            font-size: 12px;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #1111;
+            padding: 12px;
+            border-radius: 6px;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 8px;
+            border: 1px solid #bbb;
+            border-radius: 999px;
+            margin: 0 6px 6px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>StoryScope</h1>
+    <div class="card">
+        <form id="storyForm">
+            <label for="summary">Summary</label>
+            <input id="summary" name="summary" placeholder="Add user authentication" required />
+
+            <label for="description">Description</label>
+            <textarea id="description" name="description" placeholder="Implement OAuth2 based authentication system"
+                required></textarea>
+
+            <label for="labels">Labels (comma separated)</label>
+            <input id="labels" name="labels" placeholder="security, authentication" />
+
+            <div style="margin-top: 12px">
+                <button id="submitBtn" type="submit">Estimate Complexity</button>
+            </div>
+            <div class="muted" style="margin-top:8px">API: http://127.0.0.1:8000</div>
+        </form>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none">
+        <h3>Result</h3>
+        <div id="score" style="font-size: 28px; font-weight: 700; margin-bottom: 8px;"></div>
+        <div id="factors" style="margin-bottom: 12px;"></div>
+        <pre id="raw"></pre>
+    </div>
+
+    <div class="card">
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+            <h3 style="margin:0">Recent Stories</h3>
+            <button id="refreshBtn" type="button">Refresh</button>
+        </div>
+        <div id="stories" style="margin-top:12px"></div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        const form = document.getElementById("storyForm");
+        const submitBtn = document.getElementById("submitBtn");
+        const resultCard = document.getElementById("resultCard");
+        const scoreEl = document.getElementById("score");
+        const factorsEl = document.getElementById("factors");
+        const rawEl = document.getElementById("raw");
+        const storiesEl = document.getElementById("stories");
+        const refreshBtn = document.getElementById("refreshBtn");
+
+        async function estimateStory(payload) {
+            const res = await fetch(`${API_BASE}/estimate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`API error ${res.status}: ${text}`);
+            }
+            return res.json();
+        }
+
+        async function fetchStories() {
+            const res = await fetch(`${API_BASE}/stories`);
+            if (!res.ok) return [];
+            return res.json();
+        }
+
+        function renderStories(items) {
+            if (!items.length) {
+                storiesEl.innerHTML = '<div class="muted">No stories yet. Submit one above.</div>';
+                return;
+            }
+            storiesEl.innerHTML = items
+                .map((s) => {
+                    const labels = Array.isArray(s.labels) ? s.labels : [];
+                    const labelHtml = labels.map((l) => `<span class="pill">${l}</span>`).join(" ");
+                    const created = s.created_at ? new Date(s.created_at).toLocaleString() : "";
+                    return `
+              <div style="padding:10px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+                  <div style="font-weight:600">${s.summary ?? s.title ?? "(no summary)"}</div>
+                  <div class="muted">Score: ${s.complexity_score ?? "-"}</div>
+                </div>
+                <div class="muted" style="margin:6px 0">${created}</div>
+                <div style="margin:6px 0">${labelHtml}</div>
+                <div style="color:#444">${(s.description || "").slice(0, 200)}</div>
+              </div>
+            `;
+                })
+                .join("");
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            try {
+                const summary = document.getElementById("summary").value.trim();
+                const description = document.getElementById("description").value.trim();
+                const labelsRaw = document.getElementById("labels").value.trim();
+                const labels = labelsRaw ? labelsRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+                const data = await estimateStory({ summary, description, labels });
+                resultCard.style.display = "block";
+                scoreEl.textContent = `Complexity Score: ${data.complexity_score}`;
+                const a = data.analysis || {};
+                factorsEl.textContent = `Uncertainty: ${a.uncertainty_factor ?? 0} | Technical: ${a.technical_factor ?? 0} | Labels: ${a.label_factor ?? labels.length}`;
+                rawEl.textContent = JSON.stringify(data, null, 2);
+
+                const items = await fetchStories();
+                renderStories(items);
+            } catch (err) {
+                resultCard.style.display = "block";
+                scoreEl.textContent = "Error";
+                factorsEl.textContent = "";
+                rawEl.textContent = String(err);
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        refreshBtn.addEventListener("click", async () => {
+            const items = await fetchStories();
+            renderStories(items);
+        });
+
+        // Initial load
+        (async () => {
+            try {
+                const items = await fetchStories();
+                renderStories(items);
+            } catch { }
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,28 @@
+# API
+fastapi
+uvicorn[standard]
+python-multipart  # for file uploads
+pydantic
+
+# NLP
+nltk
+spacy
+scikit-learn
+transformers
+torch   # for HuggingFace models
+sentence-transformers
+
+# Database / Storage
+sqlalchemy
+psycopg2-binary   # if you use PostgreSQL
+sqlite-utils      # handy for quick prototyping
+
+# Utils
+requests
+httpx
+python-dotenv
+
+# Dev tools
+black
+flake8
+isort

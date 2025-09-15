@@ -1,0 +1,37 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: storyscope
+      POSTGRES_PASSWORD: storyscope
+      POSTGRES_DB: storyscope
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  cache:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  nlp:
+    build:
+      context: ../apps/nlp
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports: ["8001:8001"]
+    depends_on: [db, cache]
+
+  api:
+    build:
+      context: ../apps/api
+    environment:
+      DATABASE_URL: postgres://storyscope:storyscope@db:5432/storyscope
+      REDIS_URL: redis://cache:6379/0
+      NLP_URL: http://nlp:8001
+      PORT: 8000
+    ports: ["8000:8000"]
+    depends_on: [db, cache, nlp]
+
+volumes:
+  pgdata:

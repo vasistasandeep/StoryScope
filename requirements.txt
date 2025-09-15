@@ -1,0 +1,28 @@
+# API
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+
+# NLP
+nltk
+spacy
+scikit-learn
+transformers
+torch
+sentence-transformers
+
+# Database / Storage
+sqlalchemy
+psycopg2-binary
+sqlite-utils
+
+# Utils
+requests
+httpx
+python-dotenv
+
+# Dev tools
+black
+flake8
+isort
