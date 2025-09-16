@@ -45,6 +45,10 @@ app.post("/estimate", async (req, res) => {
             complexity_score,
         });
     } catch (err) {
+        if (err.response) {
+            console.error("Error in /estimate:", err.response.status, err.response.data);
+            return res.status(502).json({ error: "NLP error", status: err.response.status, data: err.response.data });
+        }
         console.error("Error in /estimate:", err.message);
         res.status(500).json({ error: "NLP service unavailable" });
     }
