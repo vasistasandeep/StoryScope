@@ -1,33 +1,24 @@
 const knex = require("knex");
 
-const databaseUrl = process.env.DATABASE_URL || null;
+const isDevelopment = process.env.NODE_ENV === 'development';
+const databaseUrl = process.env.DATABASE_URL;
 
-let db;
-if (databaseUrl) {
-    db = knex({
-        client: "pg",
-        connection: databaseUrl,
-        pool: { min: 2, max: 10 },
-        migrations: {
-            tableName: 'knex_migrations'
-        }
-    });
-    console.log("Using PostgreSQL via DATABASE_URL");
-} else {
-    db = knex({
-        client: "sqlite3",
-        connection: {
-            filename: "./guestimate.db"
-        },
-        useNullAsDefault: true,
-        migrations: {
-            tableName: 'knex_migrations'
-        }
-    });
-    console.log("Using local SQLite database ./guestimate.db");
+if (!databaseUrl && !isDevelopment) {
+    throw new Error("DATABASE_URL environment variable is required in production");
 }
 
-// Create table if it doesn't exist (simple schema for API service)
+const db = knex({
+    client: "pg",
+    connection: databaseUrl,
+    pool: { min: 2, max: 10 },
+    migrations: {
+        tableName: 'knex_migrations'
+    }
+});
+
+console.log("Using PostgreSQL database");
+
+// Create table if it doesn't exist
 async function initDB() {
     const exists = await db.schema.hasTable("stories");
     if (!exists) {
