@@ -3,7 +3,13 @@ const knex = require("knex");
 const isDevelopment = process.env.NODE_ENV === 'development';
 const databaseUrl = process.env.DATABASE_URL;
 
+// More detailed error message
 if (!databaseUrl && !isDevelopment) {
+    console.error('Configuration Error: DATABASE_URL is not set');
+    console.error('Please ensure you have:');
+    console.error('1. Created a PostgreSQL database in Railway');
+    console.error('2. Connected the database to your service');
+    console.error('3. Set the DATABASE_URL environment variable');
     throw new Error("DATABASE_URL environment variable is required in production");
 }
 
