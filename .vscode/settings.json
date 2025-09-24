@@ -1,8 +1,0 @@
-{
-  "editor.formatOnSave": true,
-  "python.defaultInterpreterPath": "python",
-  "files.exclude": {
-    "**/__pycache__": true,
-    "**/node_modules": true
-  }
-}
