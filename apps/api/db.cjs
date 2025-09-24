@@ -1,43 +1,63 @@
 const knex = require("knex");
 
 const isDevelopment = process.env.NODE_ENV === 'development';
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:cZppecqKVYIntvNwLFSFDokbfNECRwtd@postgres.railway.internal:5432/railway';
 
-// More detailed error message
-if (!databaseUrl && !isDevelopment) {
+if (!databaseUrl) {
     console.error('Configuration Error: DATABASE_URL is not set');
-    console.error('Please ensure you have:');
-    console.error('1. Created a PostgreSQL database in Railway');
-    console.error('2. Connected the database to your service');
-    console.error('3. Set the DATABASE_URL environment variable');
-    throw new Error("DATABASE_URL environment variable is required in production");
+    throw new Error("DATABASE_URL environment variable is required");
 }
 
 const db = knex({
     client: "pg",
     connection: databaseUrl,
-    pool: { min: 2, max: 10 },
+    pool: {
+        min: 2,
+        max: 10,
+        createTimeoutMillis: 3000,
+        acquireTimeoutMillis: 30000,
+        idleTimeoutMillis: 30000,
+        reapIntervalMillis: 1000,
+        createRetryIntervalMillis: 100
+    },
     migrations: {
         tableName: 'knex_migrations'
     }
 });
 
-console.log("Using PostgreSQL database");
+// Add connection testing
+const testConnection = async () => {
+    try {
+        await db.raw('SELECT 1');
+        console.log('✅ Database connection successful');
+    } catch (error) {
+        console.error('❌ Database connection failed:', error);
+        throw error;
+    }
+};
 
 // Create table if it doesn't exist
 async function initDB() {
-    const exists = await db.schema.hasTable("stories");
-    if (!exists) {
-        await db.schema.createTable("stories", (table) => {
-            table.increments("id").primary();
-            table.string("summary").notNullable();
-            table.text("description");
-            table.text("labels");
-            table.integer("complexity_score");
-            table.timestamp("created_at").defaultTo(db.fn.now());
-            table.timestamp("updated_at").defaultTo(db.fn.now());
-        });
-        console.log("✅ Table 'stories' created");
+    try {
+        await testConnection();
+        const exists = await db.schema.hasTable("stories");
+        if (!exists) {
+            await db.schema.createTable("stories", (table) => {
+                table.increments("id").primary();
+                table.string("summary").notNullable();
+                table.text("description");
+                table.text("labels");
+                table.integer("complexity_score");
+                table.timestamp("created_at").defaultTo(db.fn.now());
+                table.timestamp("updated_at").defaultTo(db.fn.now());
+            });
+            console.log("✅ Table 'stories' created");
+        } else {
+            console.log("✅ Table 'stories' already exists");
+        }
+    } catch (error) {
+        console.error('Failed to initialize database:', error);
+        throw error;
     }
 }
 
@@ -58,4 +78,4 @@ process.on('SIGINT', async () => {
     }
 });
 
-module.exports = { db, initDB };
+module.exports = { db, initDB, testConnection };
