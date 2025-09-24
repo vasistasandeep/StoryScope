@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: storyscope-api
+    env: docker
+    dockerfilePath: ./infra/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: storyscope-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: storyscope-redis
+          property: connectionString
+      - key: NLP_URL
+        value: http://localhost:8001
+      - key: PORT
+        value: 8000
+    healthCheckPath: /health
+
+  - type: worker
+    name: storyscope-nlp
+    env: docker
+    dockerfilePath: ./apps/nlp/Dockerfile
+    dockerContext: ./apps/nlp
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+databases:
+  - name: storyscope-db
+    databaseName: storyscope
+    user: storyscope
+
+  - name: storyscope-redis
+    plan: free
+

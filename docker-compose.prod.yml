@@ -1,0 +1,40 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-storyscope}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-storyscope}
+      POSTGRES_DB: ${POSTGRES_DB:-storyscope}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  cache:
+    image: redis:7
+    restart: unless-stopped
+
+  nlp:
+    build:
+      context: ./apps/nlp
+    environment:
+      PYTHONUNBUFFERED: "1"
+    depends_on: [db, cache]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://storyscope:storyscope@db:5432/storyscope}
+      REDIS_URL: ${REDIS_URL:-redis://cache:6379/0}
+      NLP_URL: ${NLP_URL:-http://nlp:8001}
+      PORT: ${PORT:-8000}
+    ports:
+      - "${PORT:-8000}:8000"
+    depends_on: [db, cache, nlp]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+
