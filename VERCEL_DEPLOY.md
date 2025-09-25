@@ -74,11 +74,19 @@ The database will be automatically initialized on first API call. Tables created
 
 ## Step 6: Test Deployment
 
+### Quick Test:
 1. Visit your Vercel URL (e.g., `https://your-project.vercel.app`)
-2. Test the health endpoint: `https://your-project.vercel.app/api/health`
-3. Sign up for a new account
-4. Submit a test story
-5. Check the dashboard
+2. Test the API: `https://your-project.vercel.app/api/test`
+3. Test the health endpoint: `https://your-project.vercel.app/api/health`
+4. Sign up for a new account
+5. Submit a test story
+6. Check the dashboard
+
+### Automated Test:
+```bash
+# Run the test script
+node test-deployment.js https://your-project.vercel.app
+```
 
 ## Project Structure for Vercel
 
@@ -111,22 +119,28 @@ All API endpoints are prefixed with `/api/`:
 
 ### Common Issues:
 
-1. **Database Connection Error**
+1. **404 Page Not Found**
+   - Check if `vercel.json` is in the root directory
+   - Verify the API function is at `api/index.js`
+   - Check Vercel build logs for errors
+   - Test `/api/test` endpoint first
+
+2. **Database Connection Error**
    - Check DATABASE_URL format
    - Ensure database is accessible from Vercel
    - Verify credentials
 
-2. **Build Failures**
+3. **Build Failures**
    - Check Node.js version (requires 18+)
    - Verify all dependencies are in package.json
    - Check build logs in Vercel dashboard
 
-3. **API 500 Errors**
+4. **API 500 Errors**
    - Check function logs in Vercel dashboard
    - Verify environment variables are set
    - Check database connectivity
 
-4. **Frontend Not Loading**
+5. **Frontend Not Loading**
    - Verify build completed successfully
    - Check if dist folder exists
    - Verify vercel.json routes configuration

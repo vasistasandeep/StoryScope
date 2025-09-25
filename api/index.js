@@ -2,10 +2,22 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
-const { db, initDB } = require("../apps/api/db.cjs");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+
+// Import database setup
+let db, initDB;
+try {
+    const dbModule = require("../apps/api/db.cjs");
+    db = dbModule.db;
+    initDB = dbModule.initDB;
+} catch (error) {
+    console.error("Database module error:", error);
+    // Fallback for development
+    db = null;
+    initDB = null;
+}
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -36,9 +48,17 @@ function requireAdmin(req, res, next) {
     next();
 }
 
+// Test endpoint
+app.get('/test', (req, res) => {
+    res.json({ message: 'API is working!', timestamp: new Date().toISOString() });
+});
+
 // Health check
 app.get('/health', async (req, res) => {
     try {
+        if (!db) {
+            return res.status(500).json({ status: 'error', db: 'not_initialized', message: 'Database not available' });
+        }
         await db.raw('SELECT 1');
         res.json({ status: 'ok', db: 'ok' });
     } catch (e) {
@@ -348,11 +368,16 @@ app.post('/jira/import', auth, async (req, res) => {
 // Initialize database on startup
 (async () => {
     try {
-        await initDB();
-        console.log('Database initialized successfully');
+        if (initDB) {
+            await initDB();
+            console.log('Database initialized successfully');
+        } else {
+            console.log('Database module not available, running without DB');
+        }
     } catch (e) {
         console.error('Database initialization failed:', e.message);
-        process.exit(1);
+        // Don't exit in serverless environment
+        console.log('Continuing without database...');
     }
 })();
 
