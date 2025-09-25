@@ -1,6 +1,6 @@
 export function getApiBase() {
     const override = localStorage.getItem('storyscope.apiUrl')
-    return override || (import.meta as any).env.VITE_API_URL || '/api'
+    return override || (import.meta as any).env.VITE_API_URL || ''
 }
 
 export function getToken() {

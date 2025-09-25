@@ -2,11 +2,11 @@
   "name": "storyscope",
   "version": "1.0.0",
   "description": "Story estimation and management platform",
-  "main": "api/index.js",
+  "main": "apps/web/dist/index.html",
   "scripts": {
     "build": "cd apps/web && npm ci && npm run build",
     "dev": "concurrently \"cd apps/api && npm run dev\" \"cd apps/web && npm run dev\"",
-    "start": "node api/index.js"
+    "start": "cd apps/web && npm run preview"
   },
   "dependencies": {
     "express": "^4.18.2",
