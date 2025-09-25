@@ -12,6 +12,8 @@ const bcrypt = require("bcryptjs");
 const app = express();
 app.use(cors({ origin: "*" }));
 app.use(bodyParser.json());
+// Global axios timeout (overridden per-call where needed)
+axios.defaults.timeout = Number(process.env.HTTP_TIMEOUT_MS || 10000);
 
 // Serve static UI (built assets from apps/web/dist) if present
 const uiDir = path.join(__dirname, "..", "web", "dist");
@@ -201,11 +203,15 @@ app.get("/stories", auth, async (req, res) => {
         const pageNum = Math.max(1, parseInt(String(page)) || 1);
         const pageSize = Math.min(50, Math.max(1, parseInt(String(limit)) || 10));
 
-        let query = db("stories").select("id", "summary", "description", "labels", "complexity_score", "created_at").where(builder => {
-            if (req.user?.id) builder.where('user_id', req.user.id);
-        });
+        let query = db("stories")
+            .select("id", "summary", "description", "labels", "complexity_score", "created_at")
+            .where((builder) => {
+                if (req.user?.id) builder.where('user_id', req.user.id);
+            });
         if (search) {
-            query = query.whereILike("summary", `%${search}%`).orWhereILike("description", `%${search}%`);
+            query = query.andWhere((q) => {
+                q.whereILike("summary", `%${search}%`).orWhereILike("description", `%${search}%`);
+            });
         }
         const [{ count }] = await query.clone().count({ count: "id" });
         const rows = await query.orderBy("id", "desc").offset((pageNum - 1) * pageSize).limit(pageSize);
@@ -347,9 +353,14 @@ app.post('/jira/export', auth, async (req, res) => {
     }
 });
 
-// Health check
-app.get("/health", (req, res) => {
-    res.json({ status: "ok" });
+// Health check (includes DB ping)
+app.get("/health", async (_req, res) => {
+    try {
+        await db.raw('SELECT 1');
+        res.json({ status: "ok", db: "ok" });
+    } catch (e) {
+        res.status(500).json({ status: "degraded", db: "error" });
+    }
 });
 
 // Root route for easy browser checks
