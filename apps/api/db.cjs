@@ -58,10 +58,23 @@ const testConnection = async () => {
 async function initDB() {
     try {
         await testConnection();
+        // users table
+        const usersExists = await db.schema.hasTable("users");
+        if (!usersExists) {
+            await db.schema.createTable("users", (t) => {
+                t.increments("id").primary();
+                t.string("email").notNullable().unique();
+                t.string("password_hash").notNullable();
+                t.timestamp("created_at").defaultTo(db.fn.now());
+            });
+            console.log("✅ Table 'users' created");
+        }
+
         const exists = await db.schema.hasTable("stories");
         if (!exists) {
             await db.schema.createTable("stories", (table) => {
                 table.increments("id").primary();
+                table.integer("user_id").references("id").inTable("users").nullable();
                 table.string("summary").notNullable();
                 table.text("description");
                 table.text("labels");

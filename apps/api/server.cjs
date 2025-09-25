@@ -6,6 +6,8 @@ const { db, initDB } = require("./db.cjs"); // knex setup in db.cjs
 const path = require("path");
 const cors = require("cors");
 const fs = require("fs");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -23,8 +25,52 @@ if (hasBuiltUI) {
     app.use(express.static(uiDir));
 }
 
+// Auth helpers
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change';
+function signToken(payload) { return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' }); }
+function auth(req, res, next) {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+}
+
+// Auth routes
+app.post('/auth/signup', async (req, res) => {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    const hash = await bcrypt.hash(String(password), 10);
+    try {
+        const [user] = await db('users').insert({ email, password_hash: hash }).returning(['id', 'email']);
+        const id = user?.id ?? user; // sqlite returns id number
+        const token = signToken({ id, email });
+        res.json({ token, user: { id, email } });
+    } catch (e) {
+        return res.status(400).json({ error: 'User exists?' });
+    }
+});
+
+app.post('/auth/login', async (req, res) => {
+    const { email, password } = req.body || {};
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    const ok = await bcrypt.compare(String(password), user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = signToken({ id: user.id, email: user.email });
+    res.json({ token, user: { id: user.id, email: user.email } });
+});
+
+app.get('/auth/me', auth, async (req, res) => {
+    res.json({ user: { id: req.user.id, email: req.user.email } });
+});
+
 // POST /estimate - analyze story & save
-app.post("/estimate", async (req, res) => {
+app.post("/estimate", auth, async (req, res) => {
     try {
         const { summary, description, labels } = req.body;
 
@@ -96,6 +142,7 @@ app.post("/estimate", async (req, res) => {
 
         // insert into DB (ensure id is returned in Postgres)
         const inserted = await db("stories").insert({
+            user_id: req.user?.id || null,
             summary,
             description,
             labels: JSON.stringify(labels || []),
@@ -123,13 +170,15 @@ app.post("/estimate", async (req, res) => {
 });
 
 // GET /stories - fetch all stories
-app.get("/stories", async (req, res) => {
+app.get("/stories", auth, async (req, res) => {
     try {
         const { search = "", page = "1", limit = "10" } = req.query;
         const pageNum = Math.max(1, parseInt(String(page)) || 1);
         const pageSize = Math.min(50, Math.max(1, parseInt(String(limit)) || 10));
 
-        let query = db("stories").select("id", "summary", "description", "labels", "complexity_score", "created_at");
+        let query = db("stories").select("id", "summary", "description", "labels", "complexity_score", "created_at").where(builder => {
+            if (req.user?.id) builder.where('user_id', req.user.id);
+        });
         if (search) {
             query = query.whereILike("summary", `%${search}%`).orWhereILike("description", `%${search}%`);
         }
@@ -150,11 +199,11 @@ app.get("/stories", async (req, res) => {
 });
 
 // GET /stories/:id - fetch single story
-app.get("/stories/:id", async (req, res) => {
+app.get("/stories/:id", auth, async (req, res) => {
     try {
         const id = Number(req.params.id);
         if (!id) return res.status(400).json({ error: "Invalid id" });
-        const row = await db("stories").where({ id }).first();
+        const row = await db("stories").where({ id, user_id: req.user?.id }).first();
         if (!row) return res.status(404).json({ error: "Not found" });
         const story = {
             ...row,
@@ -168,7 +217,7 @@ app.get("/stories/:id", async (req, res) => {
 });
 
 // PATCH /stories/:id - update story
-app.patch("/stories/:id", async (req, res) => {
+app.patch("/stories/:id", auth, async (req, res) => {
     try {
         const id = Number(req.params.id);
         const { summary, description, labels } = req.body || {};
@@ -177,8 +226,8 @@ app.patch("/stories/:id", async (req, res) => {
         if (description !== undefined) update.description = description;
         if (labels !== undefined) update.labels = JSON.stringify(labels || []);
         if (Object.keys(update).length === 0) return res.status(400).json({ error: "No fields to update" });
-        await db("stories").where({ id }).update(update);
-        const row = await db("stories").where({ id }).first();
+        await db("stories").where({ id, user_id: req.user?.id }).update(update);
+        const row = await db("stories").where({ id, user_id: req.user?.id }).first();
         if (!row) return res.status(404).json({ error: "Not found" });
         row.labels = row.labels ? JSON.parse(row.labels) : [];
         res.json(row);
@@ -189,10 +238,10 @@ app.patch("/stories/:id", async (req, res) => {
 });
 
 // DELETE /stories/:id - delete story
-app.delete("/stories/:id", async (req, res) => {
+app.delete("/stories/:id", auth, async (req, res) => {
     try {
         const id = Number(req.params.id);
-        const deleted = await db("stories").where({ id }).del();
+        const deleted = await db("stories").where({ id, user_id: req.user?.id }).del();
         if (!deleted) return res.status(404).json({ error: "Not found" });
         res.json({ ok: true });
     } catch (err) {
