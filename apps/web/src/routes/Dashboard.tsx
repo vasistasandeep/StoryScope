@@ -105,6 +105,9 @@ export default function Dashboard() {
                     <Badge label="Week Streak" unlocked={streak >= 7} />
                     <Badge label="High Complexity" unlocked={(stats?.latest || []).some(l => (l.complexity_score || 0) >= 13)} />
                 </div>
+                <div style={{ marginTop: 12 }}>
+                    <a href="/report.csv" download>Download Report (CSV)</a>
+                </div>
             </div>
 
             {showBadge && (

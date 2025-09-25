@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { apiFetch } from '../lib/api'
 
 type Story = { id: number; summary: string; description: string; labels: string[]; complexity_score: number }
 
@@ -25,8 +26,8 @@ export default function StoryDetail() {
 
     const onDelete = async () => {
         if (!id) return
-        const res = await fetch(`${apiBase}/stories/${id}`, { method: 'DELETE' })
-        if (res.ok) navigate('/recent')
+        await apiFetch(`/stories/${id}`, { method: 'DELETE' })
+        navigate('/recent')
     }
 
     if (error) return <p style={{ color: 'red' }}>{error}</p>

@@ -46,10 +46,11 @@ app.post('/auth/signup', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
     const hash = await bcrypt.hash(String(password), 10);
     try {
-        const [user] = await db('users').insert({ email, password_hash: hash }).returning(['id', 'email']);
+        const [user] = await db('users').insert({ email, password_hash: hash }).returning(['id', 'email', 'role']);
         const id = user?.id ?? user; // sqlite returns id number
-        const token = signToken({ id, email });
-        res.json({ token, user: { id, email } });
+        const found = await db('users').where({ id }).first();
+        const token = signToken({ id, email, role: found.role });
+        res.json({ token, user: { id, email, role: found.role } });
     } catch (e) {
         return res.status(400).json({ error: 'User exists?' });
     }
@@ -61,12 +62,23 @@ app.post('/auth/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     const ok = await bcrypt.compare(String(password), user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = signToken({ id: user.id, email: user.email });
-    res.json({ token, user: { id: user.id, email: user.email } });
+    const token = signToken({ id: user.id, email: user.email, role: user.role });
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
 });
 
 app.get('/auth/me', auth, async (req, res) => {
-    res.json({ user: { id: req.user.id, email: req.user.email } });
+    res.json({ user: { id: req.user.id, email: req.user.email, role: req.user.role } });
+});
+
+function requireAdmin(req, res, next) {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    next();
+}
+
+// Admin endpoints (example): list users
+app.get('/admin/users', auth, requireAdmin, async (_req, res) => {
+    const users = await db('users').select('id', 'email', 'role', 'created_at').orderBy('id', 'desc');
+    res.json(users);
 });
 
 // POST /estimate - analyze story & save
@@ -251,11 +263,14 @@ app.delete("/stories/:id", auth, async (req, res) => {
 });
 
 // GET /stats - simple stats for dashboard
-app.get("/stats", async (_req, res) => {
+app.get("/stats", auth, async (_req, res) => {
     try {
-        const total = await db("stories").count({ count: "id" }).first();
-        const avg = await db("stories").avg({ avg: "complexity_score" }).first();
-        const latest = await db("stories").select("id", "summary", "complexity_score", "created_at").orderBy("id", "desc").limit(5);
+        const userId = _req.user?.id; // optional if guarded later
+        const base = db("stories");
+        const scoped = userId ? base.where({ user_id: userId }) : base;
+        const total = await scoped.clone().count({ count: "id" }).first();
+        const avg = await scoped.clone().avg({ avg: "complexity_score" }).first();
+        const latest = await scoped.clone().select("id", "summary", "complexity_score", "created_at").orderBy("id", "desc").limit(5);
         res.json({
             total: Number(total?.count || 0),
             average_complexity: Math.round(Number(avg?.avg || 0)),
@@ -264,6 +279,58 @@ app.get("/stats", async (_req, res) => {
     } catch (err) {
         console.error("Error fetching stats:", err.message);
         res.status(500).json({ error: "Failed to fetch stats" });
+    }
+});
+
+// Dashboard report CSV (user-scoped)
+app.get('/report.csv', auth, async (req, res) => {
+    try {
+        const scoped = db('stories').where({ user_id: req.user.id });
+        const totalRow = await scoped.clone().count({ count: 'id' }).first();
+        const avgRow = await scoped.clone().avg({ avg: 'complexity_score' }).first();
+        const latest = await scoped.clone().select('id', 'summary', 'complexity_score', 'created_at').orderBy('id', 'desc').limit(20);
+        const lines = [
+            'Metric,Value',
+            `Total Stories,${Number(totalRow?.count || 0)}`,
+            `Average Complexity,${Math.round(Number(avgRow?.avg || 0))}`,
+            '',
+            'Latest ID,Summary,Complexity,Created At',
+            ...latest.map(r => {
+                const s = String(r.summary || '').replace(/"/g, '""');
+                return `${r.id},"${s}",${r.complexity_score || ''},${r.created_at || ''}`
+            })
+        ].join('\n');
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="dashboard_report.csv"');
+        res.send(lines);
+    } catch (e) {
+        res.status(500).json({ error: 'Report failed' });
+    }
+});
+
+// Jira import/export stubs
+app.get('/jira/template.csv', (_req, res) => {
+    const header = 'Summary,Description,Labels,Story Points\n';
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="jira_template.csv"');
+    res.send(header);
+});
+
+app.post('/jira/export', auth, async (req, res) => {
+    try {
+        const rows = await db('stories').select('summary', 'description', 'labels', 'complexity_score').where({ user_id: req.user.id }).orderBy('id', 'desc');
+        const header = 'Summary,Description,Labels,Story Points\n';
+        const csv = rows.map(r => {
+            const labels = (r.labels ? JSON.parse(r.labels) : []).join(' ');
+            const s = String(r.summary || '').replace(/"/g, '""');
+            const d = String(r.description || '').replace(/"/g, '""');
+            return `"${s}","${d}","${labels}",${r.complexity_score || ''}`
+        }).join('\n');
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="jira_export.csv"');
+        res.send(header + csv);
+    } catch (e) {
+        res.status(500).json({ error: 'Export failed' });
     }
 });
 

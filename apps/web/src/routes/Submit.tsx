@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import Confetti from '../components/Confetti'
 import Toast from '../components/Toast'
+import { apiFetch } from '../lib/api'
 
 export default function Submit() {
     const apiBase = useMemo(() => (import.meta as any).env.VITE_API_URL || '', [])
@@ -19,16 +20,14 @@ export default function Submit() {
         setMsg(null)
         setError(null)
         try {
-            const res = await fetch(`${apiBase}/estimate`, {
+            await apiFetch(`/estimate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     summary,
                     description,
                     labels: labels.split(',').map(s => s.trim()).filter(Boolean)
                 })
             })
-            if (!res.ok) throw new Error('Request failed')
             setSummary('')
             setDescription('')
             setLabels('')

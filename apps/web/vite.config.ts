@@ -6,11 +6,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/auth': 'http://localhost:8000',
       '/estimate': 'http://localhost:8000',
       '/stories': 'http://localhost:8000',
       '/stories/': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
       '/stats': 'http://localhost:8000',
+      '/jira': 'http://localhost:8000',
+      '/admin': 'http://localhost:8000',
     }
   }
 })

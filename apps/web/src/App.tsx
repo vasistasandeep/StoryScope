@@ -1,7 +1,9 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import './App.css'
+import { isAuthed, logout, getUser } from './lib/auth'
 
 function App() {
+  const navigate = useNavigate()
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', minHeight: '100vh' }}>
       <aside style={{ borderRight: '1px solid var(--border)', padding: 20, background: 'linear-gradient(180deg, #0c1016, #0b0d12 30%)' }}>
@@ -14,6 +16,9 @@ function App() {
           <NavLink to="/submit" style={({ isActive }) => ({ padding: '10px 12px', borderRadius: 10, color: isActive ? '#fff' : 'var(--muted)', background: isActive ? 'rgba(108, 140, 255, 0.12)' : 'transparent' })}>Submit Story</NavLink>
           <NavLink to="/recent" style={({ isActive }) => ({ padding: '10px 12px', borderRadius: 10, color: isActive ? '#fff' : 'var(--muted)', background: isActive ? 'rgba(124, 226, 209, 0.12)' : 'transparent' })}>Recent Stories</NavLink>
           <NavLink to="/settings" style={({ isActive }) => ({ padding: '10px 12px', borderRadius: 10, color: isActive ? '#fff' : 'var(--muted)', background: isActive ? 'rgba(108, 140, 255, 0.12)' : 'transparent' })}>Settings</NavLink>
+          {getUser()?.role === 'admin' && (
+            <NavLink to="/admin" style={({ isActive }) => ({ padding: '10px 12px', borderRadius: 10, color: isActive ? '#fff' : 'var(--muted)', background: isActive ? 'rgba(124, 226, 209, 0.12)' : 'transparent' })}>Admin</NavLink>
+          )}
         </nav>
         <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>v0.1 • Gamified</div>
       </aside>
@@ -21,7 +26,11 @@ function App() {
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: '1px solid var(--border)', background: 'rgba(14,17,22,0.6)', backdropFilter: 'blur(6px)' }}>
           <div className="muted">Make estimation fun — keep your streak 🔥</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button>New Story</button>
+            {!isAuthed() ? (
+              <button onClick={() => navigate('/auth')}>Login</button>
+            ) : (
+              <button onClick={() => { logout(); navigate('/auth') }}>Logout</button>
+            )}
           </div>
         </header>
         <main style={{ padding: 24 }}>

@@ -65,6 +65,7 @@ async function initDB() {
                 t.increments("id").primary();
                 t.string("email").notNullable().unique();
                 t.string("password_hash").notNullable();
+                t.string("role").notNullable().defaultTo('user');
                 t.timestamp("created_at").defaultTo(db.fn.now());
             });
             console.log("✅ Table 'users' created");

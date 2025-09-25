@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { apiFetch } from '../lib/api'
 
 type Story = { id: number; summary: string; description: string; labels: string[]; complexity_score: number }
 
@@ -13,17 +14,19 @@ export default function Recent() {
     const limit = 10
 
     useEffect(() => {
-        (async () => {
+        const controller = new AbortController()
+        const id = setTimeout(async () => {
             try {
                 const params = new URLSearchParams({ page: String(page), limit: String(limit), ...(search ? { search } : {}) })
-                const res = await fetch(`${apiBase}/stories?${params.toString()}`)
-                const data = await res.json()
+                const data = await apiFetch(`/stories?${params.toString()}`)
                 setStories(data.items || [])
                 setTotal(data.total || 0)
+                setError(null)
             } catch (e: any) {
-                setError(e?.message || 'Failed to load stories')
+                setError('Could not fetch stories. Please try again.')
             }
-        })()
+        }, 250)
+        return () => { clearTimeout(id); controller.abort() }
     }, [page, search])
 
     return (
