@@ -15,8 +15,13 @@ const shouldUseSSL = (
     )
 );
 
-// Use SQLite locally if DATABASE_URL is not provided
-const useSQLite = !databaseUrl;
+// Use SQLite only in non-production when DATABASE_URL is not provided
+const useSQLite = !databaseUrl && process.env.NODE_ENV !== 'production';
+
+if (!databaseUrl && process.env.NODE_ENV === 'production') {
+    // Fail fast in production to avoid attempting to load sqlite3
+    throw new Error('DATABASE_URL is required in production. Set it to the internal Railway Postgres URL.');
+}
 
 const db = useSQLite
     ? knex({

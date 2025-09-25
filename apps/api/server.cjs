@@ -385,10 +385,11 @@ const PORT = Number(process.env.PORT) || 8000;
 (async () => {
     try {
         await initDB();
+        app.listen(PORT, "0.0.0.0", () => {
+            console.log(`API server running on http://0.0.0.0:${PORT}`);
+        });
     } catch (e) {
         console.error("DB init failed:", e.message);
+        process.exit(1);
     }
-    app.listen(PORT, "0.0.0.0", () => {
-        console.log(`API server running on http://0.0.0.0:${PORT}`);
-    });
 })();
