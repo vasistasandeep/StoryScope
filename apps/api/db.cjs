@@ -1,7 +1,8 @@
 const knex = require("knex");
+const path = require("path");
 
 const isDevelopment = process.env.NODE_ENV === 'development';
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:cZppecqKVYIntvNwLFSFDokbfNECRwtd@postgres.railway.internal:5432/railway';
+const databaseUrl = process.env.DATABASE_URL;
 
 // Decide if SSL is needed (Railway often requires it when using external connection strings)
 const shouldUseSSL = (
@@ -14,29 +15,33 @@ const shouldUseSSL = (
     )
 );
 
-if (!databaseUrl) {
-    console.error('Configuration Error: DATABASE_URL is not set');
-    throw new Error("DATABASE_URL environment variable is required");
-}
+// Use SQLite locally if DATABASE_URL is not provided
+const useSQLite = !databaseUrl;
 
-const db = knex({
-    client: "pg",
-    connection: shouldUseSSL
-        ? { connectionString: databaseUrl, ssl: { rejectUnauthorized: false } }
-        : { connectionString: databaseUrl },
-    pool: {
-        min: 2,
-        max: 10,
-        createTimeoutMillis: 3000,
-        acquireTimeoutMillis: 30000,
-        idleTimeoutMillis: 30000,
-        reapIntervalMillis: 1000,
-        createRetryIntervalMillis: 100
-    },
-    migrations: {
-        tableName: 'knex_migrations'
-    }
-});
+const db = useSQLite
+    ? knex({
+        client: 'sqlite3',
+        connection: { filename: path.join(__dirname, 'guestimate.db') },
+        useNullAsDefault: true,
+    })
+    : knex({
+        client: "pg",
+        connection: shouldUseSSL
+            ? { connectionString: databaseUrl, ssl: { rejectUnauthorized: false } }
+            : { connectionString: databaseUrl },
+        pool: {
+            min: 2,
+            max: 10,
+            createTimeoutMillis: 3000,
+            acquireTimeoutMillis: 30000,
+            idleTimeoutMillis: 30000,
+            reapIntervalMillis: 1000,
+            createRetryIntervalMillis: 100
+        },
+        migrations: {
+            tableName: 'knex_migrations'
+        }
+    });
 
 // Add connection testing
 const testConnection = async () => {
