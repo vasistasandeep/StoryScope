@@ -84,18 +84,31 @@ app.get('/admin/users', auth, requireAdmin, async (_req, res) => {
 // POST /estimate - analyze story & save
 app.post("/estimate", auth, async (req, res) => {
     try {
-        const { summary, description, labels } = req.body;
+        const { summary, description, labels } = req.body || {};
+        if (!summary || typeof summary !== 'string') {
+            return res.status(400).json({ error: 'summary is required' });
+        }
 
         // call NLP service (with fallback to mock)
         const nlpBaseUrl = process.env.NLP_URL || "http://localhost:8001";
         let nlpResponse;
 
         try {
-            nlpResponse = await axios.post(`${nlpBaseUrl}/estimate`, {
-                summary,
-                description,
-                labels,
-            });
+            nlpResponse = await axios.post(
+                `${nlpBaseUrl}/estimate`,
+                {
+                    summary,
+                    description,
+                    labels,
+                },
+                {
+                    timeout: 5000,
+                    validateStatus: (s) => s >= 200 && s < 500, // treat 5xx as error below
+                }
+            );
+            if (!nlpResponse || nlpResponse.status >= 500) {
+                throw new Error(`NLP service error: ${nlpResponse?.status || 'no response'}`);
+            }
         } catch (nlpError) {
             console.log("NLP service unavailable, using mock service");
             // Fallback to mock NLP service
@@ -150,13 +163,13 @@ app.post("/estimate", auth, async (req, res) => {
         }
 
         // Ensure complexity_score is an integer to match DB schema
-        const complexity_score = Math.round(Number(nlpResponse.data.complexity_score) || 0);
+        const complexity_score = Math.round(Number(nlpResponse.data?.complexity_score) || 0);
 
         // insert into DB (ensure id is returned in Postgres)
         const inserted = await db("stories").insert({
             user_id: req.user?.id || null,
             summary,
-            description,
+            description: description || '',
             labels: JSON.stringify(labels || []),
             complexity_score,
         }, ["id"]);
@@ -177,7 +190,7 @@ app.post("/estimate", auth, async (req, res) => {
             return res.status(502).json({ error: "NLP error", status: err.response.status, data: err.response.data });
         }
         console.error("Error in /estimate:", err.message);
-        res.status(500).json({ error: "NLP service unavailable" });
+        res.status(500).json({ error: "Failed to estimate" });
     }
 });
 
