@@ -1,0 +1,9 @@
+node_modules
+apps/api/node_modules
+apps/web/node_modules
+apps/api/guestimate.db
+*.log
+.env
+.env.local
+.env.production.local
+.env.development.local

@@ -15,5 +15,8 @@ export default defineConfig({
       '/jira': 'http://localhost:8000',
       '/admin': 'http://localhost:8000',
     }
+  },
+  build: {
+    outDir: 'dist'
   }
 })
