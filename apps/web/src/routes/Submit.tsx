@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Confetti from '../components/Confetti'
 import Toast from '../components/Toast'
 import { apiFetch } from '../lib/api'
 
 export default function Submit() {
-    const apiBase = useMemo(() => (import.meta as any).env.VITE_API_URL || '', [])
     const [summary, setSummary] = useState('')
     const [description, setDescription] = useState('')
     const [labels, setLabels] = useState('')

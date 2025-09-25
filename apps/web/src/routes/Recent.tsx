@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '../lib/api'
 
 type Story = { id: number; summary: string; description: string; labels: string[]; complexity_score: number }
 
 export default function Recent() {
-    const apiBase = useMemo(() => (import.meta as any).env.VITE_API_URL || '', [])
     const [stories, setStories] = useState<Story[]>([])
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
