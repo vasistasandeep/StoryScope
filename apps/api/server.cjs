@@ -91,7 +91,8 @@ app.post("/estimate", async (req, res) => {
             };
         }
 
-        const complexity_score = nlpResponse.data.complexity_score || 0;
+        // Ensure complexity_score is an integer to match DB schema
+        const complexity_score = Math.round(Number(nlpResponse.data.complexity_score) || 0);
 
         // insert into DB (ensure id is returned in Postgres)
         const inserted = await db("stories").insert({
@@ -124,18 +125,96 @@ app.post("/estimate", async (req, res) => {
 // GET /stories - fetch all stories
 app.get("/stories", async (req, res) => {
     try {
-        const stories = await db("stories").select("*").orderBy("id", "desc");
+        const { search = "", page = "1", limit = "10" } = req.query;
+        const pageNum = Math.max(1, parseInt(String(page)) || 1);
+        const pageSize = Math.min(50, Math.max(1, parseInt(String(limit)) || 10));
+
+        let query = db("stories").select("id", "summary", "description", "labels", "complexity_score", "created_at");
+        if (search) {
+            query = query.whereILike("summary", `%${search}%`).orWhereILike("description", `%${search}%`);
+        }
+        const [{ count }] = await query.clone().count({ count: "id" });
+        const rows = await query.orderBy("id", "desc").offset((pageNum - 1) * pageSize).limit(pageSize);
 
         // convert labels back from JSON string
-        const parsed = stories.map((s) => ({
+        const parsed = rows.map((s) => ({
             ...s,
             labels: s.labels ? JSON.parse(s.labels) : [],
         }));
 
-        res.json(parsed);
+        res.json({ items: parsed, total: Number(count || 0), page: pageNum, limit: pageSize });
     } catch (err) {
         console.error("Error fetching stories:", err.message);
         res.status(500).json({ error: "Failed to fetch stories" });
+    }
+});
+
+// GET /stories/:id - fetch single story
+app.get("/stories/:id", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!id) return res.status(400).json({ error: "Invalid id" });
+        const row = await db("stories").where({ id }).first();
+        if (!row) return res.status(404).json({ error: "Not found" });
+        const story = {
+            ...row,
+            labels: row.labels ? JSON.parse(row.labels) : [],
+        };
+        res.json(story);
+    } catch (err) {
+        console.error("Error fetching story:", err.message);
+        res.status(500).json({ error: "Failed to fetch story" });
+    }
+});
+
+// PATCH /stories/:id - update story
+app.patch("/stories/:id", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const { summary, description, labels } = req.body || {};
+        const update = {};
+        if (summary !== undefined) update.summary = summary;
+        if (description !== undefined) update.description = description;
+        if (labels !== undefined) update.labels = JSON.stringify(labels || []);
+        if (Object.keys(update).length === 0) return res.status(400).json({ error: "No fields to update" });
+        await db("stories").where({ id }).update(update);
+        const row = await db("stories").where({ id }).first();
+        if (!row) return res.status(404).json({ error: "Not found" });
+        row.labels = row.labels ? JSON.parse(row.labels) : [];
+        res.json(row);
+    } catch (err) {
+        console.error("Error updating story:", err.message);
+        res.status(500).json({ error: "Failed to update story" });
+    }
+});
+
+// DELETE /stories/:id - delete story
+app.delete("/stories/:id", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const deleted = await db("stories").where({ id }).del();
+        if (!deleted) return res.status(404).json({ error: "Not found" });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("Error deleting story:", err.message);
+        res.status(500).json({ error: "Failed to delete story" });
+    }
+});
+
+// GET /stats - simple stats for dashboard
+app.get("/stats", async (_req, res) => {
+    try {
+        const total = await db("stories").count({ count: "id" }).first();
+        const avg = await db("stories").avg({ avg: "complexity_score" }).first();
+        const latest = await db("stories").select("id", "summary", "complexity_score", "created_at").orderBy("id", "desc").limit(5);
+        res.json({
+            total: Number(total?.count || 0),
+            average_complexity: Math.round(Number(avg?.avg || 0)),
+            latest,
+        });
+    } catch (err) {
+        console.error("Error fetching stats:", err.message);
+        res.status(500).json({ error: "Failed to fetch stats" });
     }
 });
 
