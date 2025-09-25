@@ -5,14 +5,23 @@ const axios = require("axios");
 const { db, initDB } = require("./db.cjs"); // knex setup in db.cjs
 const path = require("path");
 const cors = require("cors");
+const fs = require("fs");
 
 const app = express();
 app.use(cors({ origin: "*" }));
 app.use(bodyParser.json());
 
-// Serve static UI (apps/web)
-const uiDir = path.join(__dirname, "..", "web");
-app.use(express.static(uiDir));
+// Serve static UI (built assets from apps/web/dist) if present
+const uiDir = path.join(__dirname, "..", "web", "dist");
+const hasBuiltUI = (() => {
+    try {
+        return fs.existsSync(path.join(uiDir, "index.html"));
+    } catch (_) { return false; }
+})();
+
+if (hasBuiltUI) {
+    app.use(express.static(uiDir));
+}
 
 // POST /estimate - analyze story & save
 app.post("/estimate", async (req, res) => {
@@ -22,7 +31,7 @@ app.post("/estimate", async (req, res) => {
         // call NLP service (with fallback to mock)
         const nlpBaseUrl = process.env.NLP_URL || "http://localhost:8001";
         let nlpResponse;
-        
+
         try {
             nlpResponse = await axios.post(`${nlpBaseUrl}/estimate`, {
                 summary,
@@ -35,22 +44,22 @@ app.post("/estimate", async (req, res) => {
             const mockNlp = require('./mock-nlp.js');
             const mockApp = require('express')();
             mockApp.use(require('body-parser').json());
-            
+
             // Create a mock response
             const text = `${summary} ${description} ${(labels || []).join(' ')}`.toLowerCase();
             const wordCount = text.split(/\s+/).length;
             let complexity = Math.min(100, wordCount * 2 + Math.random() * 20);
-            
+
             if (text.includes('maybe') || text.includes('unclear') || text.includes('tbd')) {
                 complexity += 15;
             }
-            
+
             const techKeywords = ['api', 'database', 'auth', 'security', 'integration'];
             const techCount = techKeywords.filter(keyword => text.includes(keyword)).length;
             complexity += techCount * 10;
-            
+
             complexity = Math.min(100, Math.max(1, complexity));
-            
+
             const fibPoints = [1, 2, 3, 5, 8, 13, 21];
             const thresholds = [10, 20, 35, 50, 65, 80, 100];
             let storyPoints = fibPoints[0];
@@ -60,7 +69,7 @@ app.post("/estimate", async (req, res) => {
                     break;
                 }
             }
-            
+
             nlpResponse = {
                 data: {
                     summary,
@@ -134,8 +143,20 @@ app.get("/health", (req, res) => {
 
 // Root route for easy browser checks
 app.get("/", (req, res) => {
-    res.json({ service: "api", status: "ok" });
+    if (hasBuiltUI) {
+        return res.sendFile(path.join(uiDir, "index.html"));
+    }
+    return res.json({ service: "api", status: "ok" });
 });
+
+// SPA fallback for client-side routes (only when UI is built) and not for asset files
+if (hasBuiltUI) {
+    app.get("*", (req, res, next) => {
+        const requestedExtension = path.extname(req.path);
+        if (requestedExtension) return next();
+        return res.sendFile(path.join(uiDir, "index.html"));
+    });
+}
 
 // Start server
 const PORT = Number(process.env.PORT) || 8000;
