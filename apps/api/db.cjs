@@ -69,6 +69,14 @@ async function initDB() {
                 t.timestamp("created_at").defaultTo(db.fn.now());
             });
             console.log("✅ Table 'users' created");
+        } else {
+            const hasRole = await db.schema.hasColumn('users', 'role');
+            if (!hasRole) {
+                await db.schema.alterTable('users', (t) => {
+                    t.string('role').notNullable().defaultTo('user');
+                });
+                console.log("✅ Column users.role added");
+            }
         }
 
         const exists = await db.schema.hasTable("stories");
@@ -85,8 +93,18 @@ async function initDB() {
             });
             console.log("✅ Table 'stories' created");
         } else {
+            const hasUserId = await db.schema.hasColumn('stories', 'user_id');
+            if (!hasUserId) {
+                await db.schema.alterTable('stories', (t) => {
+                    t.integer('user_id').references('id').inTable('users').nullable();
+                });
+                console.log("✅ Column stories.user_id added");
+            }
             console.log("✅ Table 'stories' already exists");
         }
+        try {
+            await db.raw('CREATE INDEX IF NOT EXISTS idx_stories_user_created ON stories (user_id, created_at DESC)');
+        } catch (_) { }
     } catch (error) {
         console.error('Failed to initialize database:', error);
         throw error;
