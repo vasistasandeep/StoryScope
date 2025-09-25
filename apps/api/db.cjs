@@ -3,6 +3,17 @@ const knex = require("knex");
 const isDevelopment = process.env.NODE_ENV === 'development';
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:cZppecqKVYIntvNwLFSFDokbfNECRwtd@postgres.railway.internal:5432/railway';
 
+// Decide if SSL is needed (Railway often requires it when using external connection strings)
+const shouldUseSSL = (
+    process.env.PGSSLMODE === 'require' ||
+    process.env.DATABASE_SSL === 'true' ||
+    (
+        databaseUrl &&
+        // Internal service URL usually doesn't need SSL
+        !databaseUrl.includes('postgres.railway.internal')
+    )
+);
+
 if (!databaseUrl) {
     console.error('Configuration Error: DATABASE_URL is not set');
     throw new Error("DATABASE_URL environment variable is required");
@@ -10,7 +21,9 @@ if (!databaseUrl) {
 
 const db = knex({
     client: "pg",
-    connection: databaseUrl,
+    connection: shouldUseSSL
+        ? { connectionString: databaseUrl, ssl: { rejectUnauthorized: false } }
+        : { connectionString: databaseUrl },
     pool: {
         min: 2,
         max: 10,

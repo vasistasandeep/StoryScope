@@ -93,13 +93,16 @@ app.post("/estimate", async (req, res) => {
 
         const complexity_score = nlpResponse.data.complexity_score || 0;
 
-        // insert into DB
-        const [id] = await db("stories").insert({
+        // insert into DB (ensure id is returned in Postgres)
+        const inserted = await db("stories").insert({
             summary,
             description,
             labels: JSON.stringify(labels || []),
             complexity_score,
-        });
+        }, ["id"]);
+        const id = Array.isArray(inserted)
+            ? (typeof inserted[0] === 'object' ? inserted[0].id : inserted[0])
+            : inserted;
 
         res.json({
             id,

@@ -1,22 +1,19 @@
-# Root Dockerfile for Railway deployment
+# Root Dockerfile for Railway deployment (builds web and runs API)
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY apps/api/package.json apps/api/package-lock.json* ./
-
-# Install dependencies
-RUN npm install --omit=dev
-
-# Copy the entire project
+# Copy repo
 COPY . .
 
-# Set working directory to API
+# Build frontend
+RUN npm ci --prefix apps/web \
+    && npm run build --prefix apps/web
+
+# Install backend deps (prod)
+RUN npm ci --omit=dev --prefix apps/api
+
 WORKDIR /app/apps/api
 
-# Expose port
 EXPOSE 8000
-
-# Start command
 CMD ["node", "server.cjs"]
