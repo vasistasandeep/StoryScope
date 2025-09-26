@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Modal from '../components/Modal'
+import { apiFetch } from '../lib/api'
 
 type Stat = {
     total: number
@@ -8,16 +9,15 @@ type Stat = {
 }
 
 export default function Dashboard() {
-    const apiBase = useMemo(() => (import.meta as any).env.VITE_API_URL || '', [])
     const [stats, setStats] = useState<Stat | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch(`${apiBase}/stats`)
-                const data = await res.json()
+                const data = await apiFetch('/stats')
                 setStats(data)
+                setError(null)
             } catch (e: any) {
                 setError(e?.message || 'Failed to load stats')
             }
