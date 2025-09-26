@@ -6,7 +6,7 @@
   "scripts": {
     "build": "cd apps/web && npm ci && npm run build",
     "dev": "concurrently \"cd apps/api && npm run dev\" \"cd apps/web && npm run dev\"",
-    "start": "cd apps/web && npm run preview"
+    "start": "node apps/api/server.cjs"
   },
   "dependencies": {
     "express": "^4.18.2",
