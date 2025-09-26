@@ -1,61 +1,82 @@
 const knex = require("knex");
 const path = require("path");
 
+// Railway database configuration
+const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
 const isDevelopment = process.env.NODE_ENV === 'development';
-const databaseUrl = process.env.DATABASE_URL;
 
-// Decide if SSL is needed (Railway often requires it when using external connection strings)
-const shouldUseSSL = (
-    process.env.PGSSLMODE === 'require' ||
-    process.env.DATABASE_SSL === 'true' ||
-    (
-        databaseUrl &&
-        // Internal service URL usually doesn't need SSL
-        !databaseUrl.includes('postgres.railway.internal')
-    )
-);
+// Use SQLite only in development when no DATABASE_URL
+const useSQLite = !process.env.DATABASE_URL && isDevelopment;
 
-// Use SQLite only in non-production when DATABASE_URL is not provided
-const useSQLite = !databaseUrl && process.env.NODE_ENV !== 'production';
+// Create database connection
+let db;
 
-if (!databaseUrl && process.env.NODE_ENV === 'production') {
-    // Fail fast in production to avoid attempting to load sqlite3
-    throw new Error('DATABASE_URL is required in production. Set it to the internal Railway Postgres URL.');
-}
-
-const db = useSQLite
-    ? knex({
+if (useSQLite) {
+    console.log('🗄️ Using SQLite database for development');
+    db = knex({
         client: 'sqlite3',
-        connection: { filename: path.join(__dirname, 'guestimate.db') },
+        connection: { filename: path.join(__dirname, 'story_scope.db') },
         useNullAsDefault: true,
-    })
-    : knex({
+    });
+} else {
+    console.log('🐘 Using PostgreSQL database');
+    
+    // Railway connection - use the internal DATABASE_URL
+    const connectionString = process.env.DATABASE_URL;
+    
+    if (!connectionString) {
+        console.error('❌ DATABASE_URL not found');
+        console.error('Available vars:', {
+            PGHOST: process.env.PGHOST,
+            PGUSER: process.env.PGUSER,
+            PGDATABASE: process.env.PGDATABASE,
+            RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT
+        });
+        throw new Error('DATABASE_URL is required');
+    }
+    
+    console.log('📡 Connecting to PostgreSQL...');
+    console.log('🔗 Connection string format:', connectionString.replace(/:[^:@]*@/, ':***@'));
+    
+    db = knex({
         client: "pg",
-        connection: shouldUseSSL
-            ? { connectionString: databaseUrl, ssl: { rejectUnauthorized: false } }
-            : { connectionString: databaseUrl },
+        connection: {
+            connectionString: connectionString,
+            ssl: { rejectUnauthorized: false }
+        },
         pool: {
-            min: 2,
-            max: 10,
-            createTimeoutMillis: 3000,
-            acquireTimeoutMillis: 30000,
+            min: 1,
+            max: 3,
+            createTimeoutMillis: 30000,
+            acquireTimeoutMillis: 60000,
             idleTimeoutMillis: 30000,
             reapIntervalMillis: 1000,
-            createRetryIntervalMillis: 100
+            createRetryIntervalMillis: 2000,
+            propagateCreateError: false
         },
         migrations: {
             tableName: 'knex_migrations'
-        }
+        },
+        acquireConnectionTimeout: 60000
     });
+}
 
-// Add connection testing
-const testConnection = async () => {
-    try {
-        await db.raw('SELECT 1');
-        console.log('✅ Database connection successful');
-    } catch (error) {
-        console.error('❌ Database connection failed:', error);
-        throw error;
+// Add connection testing with retry logic
+const testConnection = async (retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await db.raw('SELECT 1');
+            console.log('✅ Database connection successful');
+            return;
+        } catch (error) {
+            console.error(`❌ Database connection attempt ${i + 1} failed:`, error.message);
+            if (i === retries - 1) {
+                console.error('🔥 All connection attempts failed');
+                throw error;
+            }
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
     }
 };
 

@@ -677,14 +677,39 @@ if (hasBuiltUI) {
 
 // Start server
 const PORT = Number(process.env.PORT) || 8000;
-(async () => {
+
+// Start server with graceful database handling
+const startServer = async () => {
     try {
+        console.log('🚀 Starting Story Scope server...');
+        console.log('🔧 Environment:', process.env.NODE_ENV || 'development');
+        console.log('🌐 Port:', PORT);
+        
+        // Try to initialize database
         await initDB();
+        console.log('✅ Database initialized successfully');
+        
+        // Start the server
         app.listen(PORT, "0.0.0.0", () => {
-            console.log(`API server running on http://0.0.0.0:${PORT}`);
+            console.log(`🎉 Story Scope API server running on http://0.0.0.0:${PORT}`);
+            console.log('📊 Health check: /health');
+            console.log('🗄️ Database: Connected');
         });
-    } catch (e) {
-        console.error("DB init failed:", e.message);
-        process.exit(1);
+        
+    } catch (error) {
+        console.error("💥 Failed to start server:", error.message);
+        console.error("🔍 Full error:", error);
+        
+        // In production, try to start without database (will fail gracefully on requests)
+        if (process.env.NODE_ENV === 'production') {
+            console.log('⚠️ Starting server without database (requests will fail until DB is fixed)');
+            app.listen(PORT, "0.0.0.0", () => {
+                console.log(`🆘 Story Scope API server running on http://0.0.0.0:${PORT} (DATABASE OFFLINE)`);
+            });
+        } else {
+            process.exit(1);
+        }
     }
-})();
+};
+
+startServer();
