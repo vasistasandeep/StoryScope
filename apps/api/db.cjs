@@ -5,17 +5,17 @@ const path = require("path");
 const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
 const isDevelopment = process.env.NODE_ENV === 'development';
 
-// Use SQLite only in development when no DATABASE_URL
-const useSQLite = !process.env.DATABASE_URL && isDevelopment;
+// Force SQLite for now to get the app working
+const useSQLite = true; // Temporary fix - force SQLite until PostgreSQL is fixed
 
 // Create database connection
 let db;
 
 if (useSQLite) {
-    console.log('🗄️ Using SQLite database for development');
+    console.log('🗄️ Using SQLite database (temporary fix for Railway PostgreSQL issues)');
     db = knex({
         client: 'sqlite3',
-        connection: { filename: path.join(__dirname, 'story_scope.db') },
+        connection: { filename: '/tmp/story_scope.db' },
         useNullAsDefault: true,
     });
 } else {
