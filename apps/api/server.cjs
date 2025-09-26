@@ -588,17 +588,31 @@ app.post('/user/onboarding/step', auth, async (req, res) => {
                 completedSteps.push(step_id);
             }
             
+            const updateData = {
+                completed_steps: JSON.stringify(completedSteps),
+                updated_at: db.fn.now()
+            };
+            
+            // Mark tutorial as completed if this is the completion step
+            if (step_id === 'tutorial_completed') {
+                updateData.tutorial_completed = true;
+            }
+            
             await db('onboarding_progress')
                 .where('user_id', req.user.id)
-                .update({
-                    completed_steps: JSON.stringify(completedSteps),
-                    updated_at: db.fn.now()
-                });
+                .update(updateData);
         } else {
-            await db('onboarding_progress').insert({
+            const insertData = {
                 user_id: req.user.id,
                 completed_steps: JSON.stringify([step_id])
-            });
+            };
+            
+            // Mark tutorial as completed if this is the completion step
+            if (step_id === 'tutorial_completed') {
+                insertData.tutorial_completed = true;
+            }
+            
+            await db('onboarding_progress').insert(insertData);
         }
 
         res.json({ success: true });

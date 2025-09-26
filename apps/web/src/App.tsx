@@ -10,9 +10,12 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
-    // Show onboarding for authenticated users on first visit
+    // The OnboardingTour component will handle checking if the user has completed the tour
+    // We just need to show it when the user is on the dashboard
     if (isAuthed() && location.pathname === '/') {
       setShowOnboarding(true)
+    } else {
+      setShowOnboarding(false)
     }
   }, [location.pathname])
 

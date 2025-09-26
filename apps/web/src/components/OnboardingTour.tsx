@@ -87,12 +87,26 @@ export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
 
     const loadOnboardingProgress = async () => {
         try {
+            // Check localStorage first for immediate feedback
+            const localCompleted = localStorage.getItem('storyscope.onboarding.completed')
+            if (localCompleted === 'true') {
+                return // Don't show tour if already completed locally
+            }
+
             const progress = await apiFetch('/user/onboarding')
             if (!progress.tutorial_completed) {
                 setIsVisible(true)
+            } else {
+                // Mark as completed in localStorage for future visits
+                localStorage.setItem('storyscope.onboarding.completed', 'true')
             }
         } catch (error) {
             console.error('Failed to load onboarding progress:', error)
+            // If API fails, still check localStorage to avoid showing tour repeatedly
+            const localCompleted = localStorage.getItem('storyscope.onboarding.completed')
+            if (localCompleted !== 'true') {
+                setIsVisible(true)
+            }
         }
     }
 
@@ -123,6 +137,8 @@ export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
             } catch (error) {
                 console.error('Failed to mark tutorial as completed:', error)
             }
+            // Always mark as completed in localStorage
+            localStorage.setItem('storyscope.onboarding.completed', 'true')
             setIsVisible(false)
             onComplete()
         }
@@ -137,6 +153,8 @@ export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
         } catch (error) {
             console.error('Failed to skip tutorial:', error)
         }
+        // Always mark as completed in localStorage
+        localStorage.setItem('storyscope.onboarding.completed', 'true')
         setIsVisible(false)
         onComplete()
     }
