@@ -134,50 +134,112 @@ app.post("/estimate", auth, async (req, res) => {
         } catch (nlpError) {
             console.log("NLP service unavailable, using mock service");
             // Fallback to mock NLP service - create mock response directly
+            // Enhanced estimation with hour-based calculations using login story as baseline
             const text = `${summary} ${description} ${(labels || []).join(' ')} ${team || ''} ${module || ''}`.toLowerCase();
             const wordCount = text.split(/\s+/).length;
-            let complexity = Math.min(100, wordCount * 2 + Math.random() * 20);
+            
+            // Baseline: Simple login story = 8 hours (1 story point)
+            const LOGIN_BASELINE_HOURS = 8;
+            
+            // Calculate base complexity score
+            let complexity = Math.min(100, wordCount * 2 + Math.random() * 10);
+
+            // Story type analysis for more accurate estimation
+            const storyTypes = {
+                'login': { baseHours: 8, keywords: ['login', 'auth', 'authentication', 'signin', 'sign in'] },
+                'crud': { baseHours: 12, keywords: ['create', 'read', 'update', 'delete', 'crud', 'form', 'list'] },
+                'api': { baseHours: 16, keywords: ['api', 'endpoint', 'service', 'integration', 'rest', 'graphql'] },
+                'ui': { baseHours: 10, keywords: ['ui', 'interface', 'component', 'page', 'screen', 'design'] },
+                'database': { baseHours: 20, keywords: ['database', 'schema', 'migration', 'query', 'sql', 'table'] },
+                'security': { baseHours: 24, keywords: ['security', 'encryption', 'validation', 'permission', 'role'] },
+                'integration': { baseHours: 32, keywords: ['integration', 'third-party', 'external', 'webhook', 'sync'] },
+                'deployment': { baseHours: 16, keywords: ['deployment', 'deploy', 'ci/cd', 'pipeline', 'docker'] }
+            };
+
+            // Determine story type and base hours
+            let baseHours = LOGIN_BASELINE_HOURS;
+            let detectedType = 'general';
+            
+            for (const [type, config] of Object.entries(storyTypes)) {
+                const matchCount = config.keywords.filter(keyword => text.includes(keyword)).length;
+                if (matchCount > 0) {
+                    baseHours = config.baseHours;
+                    detectedType = type;
+                    complexity += matchCount * 5; // Boost complexity for keyword matches
+                    break;
+                }
+            }
 
             // Estimation type factor
             if (estimation_type === 'module') {
-                complexity *= 1.5; // Module-level estimations are typically more complex
+                baseHours *= 2.5; // Module-level estimations are significantly more complex
+                complexity *= 1.5;
             }
 
-            // Team-specific complexity adjustments
-            const teamComplexityFactors = {
-                'Backend': 1.2,
-                'Frontend': 1.0,
-                'QA': 0.8,
-                'DevOps': 1.3,
-                'Design': 0.9,
-                'Product': 0.7
+            // Team-specific complexity adjustments (based on typical team velocities)
+            const teamFactors = {
+                'Backend': { complexity: 1.2, hourMultiplier: 1.1 },
+                'Frontend': { complexity: 1.0, hourMultiplier: 1.0 },
+                'QA': { complexity: 0.8, hourMultiplier: 1.3 }, // QA takes longer but less complex
+                'DevOps': { complexity: 1.3, hourMultiplier: 1.4 },
+                'Design': { complexity: 0.9, hourMultiplier: 1.2 },
+                'Product': { complexity: 0.7, hourMultiplier: 0.8 }
             };
-            if (team && teamComplexityFactors[team]) {
-                complexity *= teamComplexityFactors[team];
+            
+            if (team && teamFactors[team]) {
+                complexity *= teamFactors[team].complexity;
+                baseHours *= teamFactors[team].hourMultiplier;
             }
 
-            // Priority factor
-            const priorityFactors = { 1: 1.3, 2: 1.1, 3: 1.0, 4: 0.9, 5: 0.8 };
-            complexity *= priorityFactors[priority] || 1.0;
+            // Priority factor (higher priority = more thorough work needed)
+            const priorityFactors = { 1: 1.4, 2: 1.2, 3: 1.0, 4: 0.9, 5: 0.8 };
+            const priorityMultiplier = priorityFactors[priority] || 1.0;
+            complexity *= priorityMultiplier;
+            baseHours *= priorityMultiplier;
 
-            if (text.includes('maybe') || text.includes('unclear') || text.includes('tbd')) {
-                complexity += 15;
+            // Uncertainty penalty
+            const uncertaintyKeywords = ['maybe', 'unclear', 'tbd', 'unknown', 'investigate', 'research'];
+            const uncertaintyCount = uncertaintyKeywords.filter(keyword => text.includes(keyword)).length;
+            if (uncertaintyCount > 0) {
+                complexity += uncertaintyCount * 15;
+                baseHours *= (1 + uncertaintyCount * 0.3); // 30% more time per uncertainty
             }
 
-            const techKeywords = ['api', 'database', 'auth', 'security', 'integration', 'microservice', 'deployment'];
+            // Technical complexity boost
+            const techKeywords = ['microservice', 'scalability', 'performance', 'optimization', 'algorithm', 'architecture'];
             const techCount = techKeywords.filter(keyword => text.includes(keyword)).length;
-            complexity += techCount * 10;
+            complexity += techCount * 12;
+            baseHours *= (1 + techCount * 0.25);
 
+            // Finalize complexity score
             complexity = Math.min(100, Math.max(1, complexity));
 
+            // Calculate story points using Fibonacci sequence
             const fibPoints = [1, 2, 3, 5, 8, 13, 21];
-            const thresholds = [10, 20, 35, 50, 65, 80, 100];
+            const thresholds = [15, 25, 40, 55, 70, 85, 100];
             let storyPoints = fibPoints[0];
             for (let i = 0; i < thresholds.length; i++) {
                 if (complexity <= thresholds[i]) {
                     storyPoints = fibPoints[i];
                     break;
                 }
+            }
+
+            // Calculate estimated hours (round to nearest 0.5 hour)
+            const estimatedHours = Math.round(baseHours * 2) / 2;
+            
+            // Calculate confidence level based on story clarity
+            const confidenceFactors = {
+                highConfidence: ['login', 'crud', 'simple', 'basic', 'standard'],
+                mediumConfidence: ['complex', 'advanced', 'custom'],
+                lowConfidence: ['unclear', 'tbd', 'investigate', 'research', 'unknown']
+            };
+            
+            let confidence = 'medium';
+            if (confidenceFactors.highConfidence.some(word => text.includes(word))) {
+                confidence = 'high';
+            } else if (confidenceFactors.lowConfidence.some(word => text.includes(word))) {
+                confidence = 'low';
             }
 
             nlpResponse = {
@@ -187,20 +249,29 @@ app.post("/estimate", auth, async (req, res) => {
                     labels: labels || [],
                     complexity_score: Math.round(complexity * 10) / 10,
                     story_points: storyPoints,
+                    estimated_hours: estimatedHours,
+                    story_type: detectedType,
+                    confidence_level: confidence,
                     estimation_type,
                     team,
                     module,
                     priority,
+                    baseline_reference: {
+                        type: 'login_story',
+                        hours: LOGIN_BASELINE_HOURS,
+                        description: 'Simple user login functionality'
+                    },
                     analysis: {
                         token_count: wordCount,
                         sentence_count: text.split(/[.!?]+/).length,
                         avg_sentence_len: wordCount / Math.max(1, text.split(/[.!?]+/).length),
-                        uncertainty_factor: (text.match(/maybe|unclear|tbd|unknown/gi) || []).length,
+                        uncertainty_factor: uncertaintyCount,
                         technical_factor: techCount,
                         entity_factor: 0,
                         label_factor: (labels || []).length,
-                        team_factor: team ? 1 : 0,
-                        priority_factor: priorityFactors[priority] || 1.0,
+                        team_factor: team ? teamFactors[team]?.hourMultiplier || 1 : 1,
+                        priority_factor: priorityMultiplier,
+                        story_type_factor: baseHours / LOGIN_BASELINE_HOURS,
                         short_sentence_penalty: 0
                     }
                 }
@@ -250,12 +321,18 @@ app.post("/estimate", auth, async (req, res) => {
             description,
             labels,
             complexity_score,
+            story_points: nlpResponse.data?.story_points || 1,
+            estimated_hours: nlpResponse.data?.estimated_hours || 8,
+            story_type: nlpResponse.data?.story_type || 'general',
+            confidence_level: nlpResponse.data?.confidence_level || 'medium',
+            baseline_reference: nlpResponse.data?.baseline_reference,
             estimation_type,
             team,
             module,
             priority,
             tags,
-            status: 'estimated'
+            status: 'estimated',
+            analysis: nlpResponse.data?.analysis
         });
     } catch (err) {
         if (err.response) {

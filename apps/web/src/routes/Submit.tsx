@@ -146,7 +146,7 @@ export default function Submit() {
         setError(null)
         
         try {
-            await apiFetch(`/estimate`, {
+            const result = await apiFetch(`/estimate`, {
                 method: 'POST',
                 body: JSON.stringify({
                     summary: formData.summary,
@@ -173,7 +173,16 @@ export default function Submit() {
             })
             localStorage.removeItem('story-draft')
             
-            setMsg('Story estimated successfully! Check Recent Stories.')
+            // Show detailed estimation results
+            const hours = result.estimated_hours || 8
+            const storyPoints = result.story_points || 1
+            const storyType = result.story_type || 'general'
+            const confidence = result.confidence_level || 'medium'
+            
+            setMsg(`✅ Story estimated successfully! 
+📊 Estimated: ${hours} hours (${storyPoints} story points)
+🎯 Type: ${storyType} | Confidence: ${confidence}
+📋 Check Recent Stories for details.`)
             setBurst(b => b + 1)
             setToast(true)
         } catch (e: any) {
