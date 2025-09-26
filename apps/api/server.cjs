@@ -215,20 +215,36 @@ app.post("/estimate", auth, async (req, res) => {
         // Ensure complexity_score is an integer to match DB schema
         const complexity_score = Math.round(Number(nlpResponse.data?.complexity_score) || 0);
 
-        // insert into DB with new fields (ensure id is returned in Postgres)
-        const inserted = await db("stories").insert({
+        // Prepare data for insertion, only include fields that exist in the database
+        const insertData = {
             user_id: req.user?.id || null,
             summary,
             description: description || '',
             labels: JSON.stringify(labels || []),
-            complexity_score,
-            estimation_type,
-            team: team || null,
-            module: module || null,
-            priority,
-            tags: tags || null,
-            status: 'estimated'
-        }, ["id"]);
+            complexity_score
+        };
+
+        // Add new fields only if they exist in the database schema
+        try {
+            const hasEstimationType = await db.schema.hasColumn('stories', 'estimation_type');
+            const hasTeam = await db.schema.hasColumn('stories', 'team');
+            const hasModule = await db.schema.hasColumn('stories', 'module');
+            const hasPriority = await db.schema.hasColumn('stories', 'priority');
+            const hasTags = await db.schema.hasColumn('stories', 'tags');
+            const hasStatus = await db.schema.hasColumn('stories', 'status');
+
+            if (hasEstimationType) insertData.estimation_type = estimation_type;
+            if (hasTeam) insertData.team = team || null;
+            if (hasModule) insertData.module = module || null;
+            if (hasPriority) insertData.priority = priority;
+            if (hasTags) insertData.tags = tags || null;
+            if (hasStatus) insertData.status = 'estimated';
+        } catch (schemaError) {
+            console.log("Schema check failed, using basic fields only:", schemaError.message);
+        }
+
+        // insert into DB (ensure id is returned in Postgres)
+        const inserted = await db("stories").insert(insertData, ["id"]);
         const id = Array.isArray(inserted)
             ? (typeof inserted[0] === 'object' ? inserted[0].id : inserted[0])
             : inserted;
@@ -597,13 +613,48 @@ app.post('/user/onboarding/step', auth, async (req, res) => {
     }
 });
 
+// Database migration endpoint (admin only)
+app.post("/admin/migrate", auth, requireAdmin, async (_req, res) => {
+    try {
+        console.log("Starting database migration...");
+        await initDB();
+        res.json({ success: true, message: "Database migration completed successfully" });
+    } catch (error) {
+        console.error("Migration failed:", error);
+        res.status(500).json({ error: "Migration failed", details: error.message });
+    }
+});
+
 // Health check (includes DB ping)
 app.get("/health", async (_req, res) => {
     try {
         await db.raw('SELECT 1');
-        res.json({ status: "ok", db: "ok" });
+        
+        // Check if new columns exist
+        const hasNewColumns = await Promise.all([
+            db.schema.hasColumn('stories', 'estimation_type'),
+            db.schema.hasColumn('stories', 'team'),
+            db.schema.hasColumn('stories', 'priority'),
+            db.schema.hasTable('comments'),
+            db.schema.hasTable('user_preferences')
+        ]);
+        
+        const schemaStatus = hasNewColumns.every(Boolean) ? "updated" : "needs_migration";
+        
+        res.json({ 
+            status: "ok", 
+            db: "ok", 
+            schema: schemaStatus,
+            columns: {
+                estimation_type: hasNewColumns[0],
+                team: hasNewColumns[1], 
+                priority: hasNewColumns[2],
+                comments_table: hasNewColumns[3],
+                preferences_table: hasNewColumns[4]
+            }
+        });
     } catch (e) {
-        res.status(500).json({ status: "degraded", db: "error" });
+        res.status(500).json({ status: "degraded", db: "error", error: e.message });
     }
 });
 
