@@ -136,14 +136,9 @@
 ### **Financial Impact (Annual)**
 ```
 💰 Cost Savings per Team (10 developers):
-   → Planning Time: $24,000/year saved
-   → Reduced Overruns: $150,000/year saved
-   → Total Savings: $174,000/year per team
 
 🎯 ROI Calculation:
-   → Development Cost: $50,000
-   → Annual Savings: $174,000
-   → ROI: 248% in first year
+
 ```
 
 ---
@@ -178,13 +173,6 @@
 
 ---
 
-## 🌍 **Market Opportunity**
-
-### **Target Market Size**
-- **Global Agile Market:** $2.8B (2024) → $5.5B (2030)
-- **Project Management Software:** $6.6B market
-- **Target Audience:** 50M+ developers worldwide
-
 ### **Competitive Advantage**
 ```
 🎯 Unique Value Propositions:
@@ -212,9 +200,8 @@
 - ✅ **Comprehensive test coverage**
 
 ### **Business Metrics (Projected)**
-- 🎯 **500+ users** in first 3 months
+- 🎯 **50+ users** in first 3 months
 - 🎯 **85% estimation accuracy** within 6 months
-- 🎯 **$10K MRR** by month 6
 - 🎯 **4.5+ star rating** user satisfaction
 
 ### **User Engagement**
@@ -275,33 +262,8 @@
    - Partner with agile consulting firms
    - Explore acquisition opportunities
 
-### **Investment Required**
-```
-💰 Ongoing Development: $200K/year
-📈 Marketing & Sales: $150K/year
-🏢 Infrastructure: $50K/year
-👥 Team Expansion: $300K/year
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Total Investment: $700K/year
-🎯 Projected Revenue: $2M+/year (Year 2)
-💎 Net ROI: 185%+ annually
-```
 
 ---
-
-## 🎯 **Call to Action**
-
-### **Decision Points**
-1. **✅ Approve internal deployment** across all teams
-2. **✅ Greenlight external beta program** with select clients
-3. **✅ Allocate budget** for team expansion and marketing
-4. **✅ Set timeline** for public launch (Q2 2026)
-
-### **Success Factors**
-- **Strong leadership support** for adoption
-- **Dedicated product team** for continuous improvement
-- **Customer-centric approach** for feature development
-- **Data-driven decisions** based on usage analytics
 
 ---
 
@@ -310,8 +272,7 @@
 ### **Questions & Discussion**
 
 **Contact Information:**
-- **Project Lead:** [Your Name]
-- **Email:** [Your Email]
+- **Project Lead:** Vasista Sandeep
 - **Demo URL:** https://storyscope-production.up.railway.app
 - **Documentation:** Available in project repository
 
