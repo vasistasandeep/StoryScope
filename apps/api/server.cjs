@@ -133,12 +133,7 @@ app.post("/estimate", auth, async (req, res) => {
             }
         } catch (nlpError) {
             console.log("NLP service unavailable, using mock service");
-            // Fallback to mock NLP service
-            const mockNlp = require('./mock-nlp.js');
-            const mockApp = require('express')();
-            mockApp.use(require('body-parser').json());
-
-            // Create an enhanced mock response
+            // Fallback to mock NLP service - create mock response directly
             const text = `${summary} ${description} ${(labels || []).join(' ')} ${team || ''} ${module || ''}`.toLowerCase();
             const wordCount = text.split(/\s+/).length;
             let complexity = Math.min(100, wordCount * 2 + Math.random() * 20);
