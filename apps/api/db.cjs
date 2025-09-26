@@ -93,6 +93,14 @@ async function initDB() {
                 table.text("description");
                 table.text("labels");
                 table.integer("complexity_score");
+                table.string("estimation_type").defaultTo('story'); // 'story' or 'module'
+                table.string("team").nullable(); // Backend, Frontend, QA, etc.
+                table.string("module").nullable(); // Module name for module-level estimation
+                table.integer("actual_effort").nullable(); // For feedback loop
+                table.boolean("feedback_provided").defaultTo(false);
+                table.text("tags").nullable(); // For better categorization
+                table.integer("priority").defaultTo(3); // 1-5 priority scale
+                table.string("status").defaultTo('estimated'); // estimated, in_progress, completed
                 table.timestamp("created_at").defaultTo(db.fn.now());
                 table.timestamp("updated_at").defaultTo(db.fn.now());
             });
@@ -105,10 +113,96 @@ async function initDB() {
                 });
                 console.log("✅ Column stories.user_id added");
             }
-            console.log("✅ Table 'stories' already exists");
+            
+            // Add new columns for enhanced features
+            const newColumns = [
+                'estimation_type', 'team', 'module', 'actual_effort', 
+                'feedback_provided', 'tags', 'priority', 'status'
+            ];
+            
+            for (const column of newColumns) {
+                const hasColumn = await db.schema.hasColumn('stories', column);
+                if (!hasColumn) {
+                    await db.schema.alterTable('stories', (t) => {
+                        switch(column) {
+                            case 'estimation_type':
+                                t.string('estimation_type').defaultTo('story');
+                                break;
+                            case 'team':
+                            case 'module':
+                            case 'tags':
+                            case 'status':
+                                t.string(column).nullable();
+                                break;
+                            case 'actual_effort':
+                            case 'priority':
+                                t.integer(column).nullable();
+                                break;
+                            case 'feedback_provided':
+                                t.boolean(column).defaultTo(false);
+                                break;
+                        }
+                    });
+                    console.log(`✅ Column stories.${column} added`);
+                }
+            }
+            
+            // Set default values for existing records
+            await db('stories').whereNull('estimation_type').update({ estimation_type: 'story' });
+            await db('stories').whereNull('status').update({ status: 'estimated' });
+            await db('stories').whereNull('priority').update({ priority: 3 });
+            
+            console.log("✅ Table 'stories' updated with new columns");
         }
+
+        // Comments table for collaboration
+        const commentsExists = await db.schema.hasTable("comments");
+        if (!commentsExists) {
+            await db.schema.createTable("comments", (table) => {
+                table.increments("id").primary();
+                table.integer("story_id").references("id").inTable("stories").onDelete("CASCADE");
+                table.integer("user_id").references("id").inTable("users").nullable();
+                table.text("content").notNullable();
+                table.timestamp("created_at").defaultTo(db.fn.now());
+            });
+            console.log("✅ Table 'comments' created");
+        }
+
+        // User preferences table
+        const preferencesExists = await db.schema.hasTable("user_preferences");
+        if (!preferencesExists) {
+            await db.schema.createTable("user_preferences", (table) => {
+                table.increments("id").primary();
+                table.integer("user_id").references("id").inTable("users").onDelete("CASCADE").unique();
+                table.boolean("dark_mode").defaultTo(false);
+                table.boolean("auto_save").defaultTo(true);
+                table.boolean("show_tooltips").defaultTo(true);
+                table.string("default_team").nullable();
+                table.json("notification_settings").nullable();
+                table.timestamp("created_at").defaultTo(db.fn.now());
+                table.timestamp("updated_at").defaultTo(db.fn.now());
+            });
+            console.log("✅ Table 'user_preferences' created");
+        }
+
+        // Onboarding progress table
+        const onboardingExists = await db.schema.hasTable("onboarding_progress");
+        if (!onboardingExists) {
+            await db.schema.createTable("onboarding_progress", (table) => {
+                table.increments("id").primary();
+                table.integer("user_id").references("id").inTable("users").onDelete("CASCADE").unique();
+                table.boolean("tutorial_completed").defaultTo(false);
+                table.json("completed_steps").nullable(); // Array of completed step IDs
+                table.timestamp("created_at").defaultTo(db.fn.now());
+                table.timestamp("updated_at").defaultTo(db.fn.now());
+            });
+            console.log("✅ Table 'onboarding_progress' created");
+        }
+
         try {
             await db.raw('CREATE INDEX IF NOT EXISTS idx_stories_user_created ON stories (user_id, created_at DESC)');
+            await db.raw('CREATE INDEX IF NOT EXISTS idx_stories_team_status ON stories (team, status)');
+            await db.raw('CREATE INDEX IF NOT EXISTS idx_comments_story ON comments (story_id, created_at DESC)');
         } catch (_) { }
     } catch (error) {
         console.error('Failed to initialize database:', error);

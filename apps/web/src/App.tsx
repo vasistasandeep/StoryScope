@@ -1,9 +1,21 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import './App.css'
 import { isAuthed, logout, getUser } from './lib/auth'
+import OnboardingTour from './components/OnboardingTour'
 
 function App() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  useEffect(() => {
+    // Show onboarding for authenticated users on first visit
+    if (isAuthed() && location.pathname === '/') {
+      setShowOnboarding(true)
+    }
+  }, [location.pathname])
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', minHeight: '100vh' }}>
       <aside style={{ borderRight: '1px solid var(--border)', padding: 20, background: 'linear-gradient(180deg, #0c1016, #0b0d12 30%)' }}>
@@ -37,6 +49,14 @@ function App() {
           <Outlet />
         </main>
       </div>
+      
+      {/* Onboarding Tour */}
+      {showOnboarding && (
+        <OnboardingTour 
+          currentRoute={location.pathname}
+          onComplete={() => setShowOnboarding(false)} 
+        />
+      )}
     </div>
   )
 }

@@ -86,9 +86,25 @@ app.get('/admin/users', auth, requireAdmin, async (_req, res) => {
 // POST /estimate - analyze story & save
 app.post("/estimate", auth, async (req, res) => {
     try {
-        const { summary, description, labels } = req.body || {};
+        const { 
+            summary, 
+            description, 
+            labels, 
+            estimation_type = 'story',
+            team,
+            module,
+            priority = 3,
+            tags
+        } = req.body || {};
+        
         if (!summary || typeof summary !== 'string') {
             return res.status(400).json({ error: 'summary is required' });
+        }
+        
+        // Validate module-level estimation requirements
+        if (estimation_type === 'module') {
+            if (!team) return res.status(400).json({ error: 'team required for module-level estimation' });
+            if (!module) return res.status(400).json({ error: 'module required for module-level estimation' });
         }
 
         // call NLP service (with fallback to mock)
@@ -102,6 +118,10 @@ app.post("/estimate", auth, async (req, res) => {
                     summary,
                     description,
                     labels,
+                    estimation_type,
+                    team,
+                    module,
+                    priority
                 },
                 {
                     timeout: 5000,
@@ -118,16 +138,38 @@ app.post("/estimate", auth, async (req, res) => {
             const mockApp = require('express')();
             mockApp.use(require('body-parser').json());
 
-            // Create a mock response
-            const text = `${summary} ${description} ${(labels || []).join(' ')}`.toLowerCase();
+            // Create an enhanced mock response
+            const text = `${summary} ${description} ${(labels || []).join(' ')} ${team || ''} ${module || ''}`.toLowerCase();
             const wordCount = text.split(/\s+/).length;
             let complexity = Math.min(100, wordCount * 2 + Math.random() * 20);
+
+            // Estimation type factor
+            if (estimation_type === 'module') {
+                complexity *= 1.5; // Module-level estimations are typically more complex
+            }
+
+            // Team-specific complexity adjustments
+            const teamComplexityFactors = {
+                'Backend': 1.2,
+                'Frontend': 1.0,
+                'QA': 0.8,
+                'DevOps': 1.3,
+                'Design': 0.9,
+                'Product': 0.7
+            };
+            if (team && teamComplexityFactors[team]) {
+                complexity *= teamComplexityFactors[team];
+            }
+
+            // Priority factor
+            const priorityFactors = { 1: 1.3, 2: 1.1, 3: 1.0, 4: 0.9, 5: 0.8 };
+            complexity *= priorityFactors[priority] || 1.0;
 
             if (text.includes('maybe') || text.includes('unclear') || text.includes('tbd')) {
                 complexity += 15;
             }
 
-            const techKeywords = ['api', 'database', 'auth', 'security', 'integration'];
+            const techKeywords = ['api', 'database', 'auth', 'security', 'integration', 'microservice', 'deployment'];
             const techCount = techKeywords.filter(keyword => text.includes(keyword)).length;
             complexity += techCount * 10;
 
@@ -150,6 +192,10 @@ app.post("/estimate", auth, async (req, res) => {
                     labels: labels || [],
                     complexity_score: Math.round(complexity * 10) / 10,
                     story_points: storyPoints,
+                    estimation_type,
+                    team,
+                    module,
+                    priority,
                     analysis: {
                         token_count: wordCount,
                         sentence_count: text.split(/[.!?]+/).length,
@@ -158,6 +204,8 @@ app.post("/estimate", auth, async (req, res) => {
                         technical_factor: techCount,
                         entity_factor: 0,
                         label_factor: (labels || []).length,
+                        team_factor: team ? 1 : 0,
+                        priority_factor: priorityFactors[priority] || 1.0,
                         short_sentence_penalty: 0
                     }
                 }
@@ -167,13 +215,19 @@ app.post("/estimate", auth, async (req, res) => {
         // Ensure complexity_score is an integer to match DB schema
         const complexity_score = Math.round(Number(nlpResponse.data?.complexity_score) || 0);
 
-        // insert into DB (ensure id is returned in Postgres)
+        // insert into DB with new fields (ensure id is returned in Postgres)
         const inserted = await db("stories").insert({
             user_id: req.user?.id || null,
             summary,
             description: description || '',
             labels: JSON.stringify(labels || []),
             complexity_score,
+            estimation_type,
+            team: team || null,
+            module: module || null,
+            priority,
+            tags: tags || null,
+            status: 'estimated'
         }, ["id"]);
         const id = Array.isArray(inserted)
             ? (typeof inserted[0] === 'object' ? inserted[0].id : inserted[0])
@@ -185,6 +239,12 @@ app.post("/estimate", auth, async (req, res) => {
             description,
             labels,
             complexity_score,
+            estimation_type,
+            team,
+            module,
+            priority,
+            tags,
+            status: 'estimated'
         });
     } catch (err) {
         if (err.response) {
@@ -350,6 +410,190 @@ app.post('/jira/export', auth, async (req, res) => {
         res.send(header + csv);
     } catch (e) {
         res.status(500).json({ error: 'Export failed' });
+    }
+});
+
+// Comments endpoints
+app.get('/stories/:id/comments', auth, async (req, res) => {
+    try {
+        const storyId = parseInt(req.params.id);
+        const comments = await db('comments')
+            .join('users', 'comments.user_id', 'users.id')
+            .select('comments.*', 'users.email as user_email')
+            .where('comments.story_id', storyId)
+            .orderBy('comments.created_at', 'desc');
+        res.json(comments);
+    } catch (err) {
+        console.error('Error fetching comments:', err.message);
+        res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+});
+
+app.post('/stories/:id/comments', auth, async (req, res) => {
+    try {
+        const storyId = parseInt(req.params.id);
+        const { content } = req.body;
+        
+        if (!content || !content.trim()) {
+            return res.status(400).json({ error: 'Comment content is required' });
+        }
+
+        const [commentId] = await db('comments').insert({
+            story_id: storyId,
+            user_id: req.user.id,
+            content: content.trim()
+        }, ['id']);
+
+        const comment = await db('comments')
+            .join('users', 'comments.user_id', 'users.id')
+            .select('comments.*', 'users.email as user_email')
+            .where('comments.id', commentId.id || commentId)
+            .first();
+
+        res.json(comment);
+    } catch (err) {
+        console.error('Error creating comment:', err.message);
+        res.status(500).json({ error: 'Failed to create comment' });
+    }
+});
+
+// Feedback endpoint for reinforcement learning
+app.post('/stories/:id/feedback', auth, async (req, res) => {
+    try {
+        const storyId = parseInt(req.params.id);
+        const { actual_effort, feedback_notes } = req.body;
+        
+        if (!actual_effort || actual_effort < 0) {
+            return res.status(400).json({ error: 'Valid actual effort is required' });
+        }
+
+        await db('stories')
+            .where({ id: storyId, user_id: req.user.id })
+            .update({
+                actual_effort,
+                feedback_provided: true,
+                updated_at: db.fn.now()
+            });
+
+        // Add feedback as a comment
+        if (feedback_notes) {
+            await db('comments').insert({
+                story_id: storyId,
+                user_id: req.user.id,
+                content: `📊 Feedback: Actual effort was ${actual_effort} points. ${feedback_notes}`
+            });
+        }
+
+        res.json({ success: true, message: 'Feedback recorded successfully' });
+    } catch (err) {
+        console.error('Error recording feedback:', err.message);
+        res.status(500).json({ error: 'Failed to record feedback' });
+    }
+});
+
+// User preferences endpoints
+app.get('/user/preferences', auth, async (req, res) => {
+    try {
+        const preferences = await db('user_preferences')
+            .where('user_id', req.user.id)
+            .first();
+        
+        res.json(preferences || {
+            dark_mode: false,
+            auto_save: true,
+            show_tooltips: true,
+            default_team: null,
+            notification_settings: {}
+        });
+    } catch (err) {
+        console.error('Error fetching preferences:', err.message);
+        res.status(500).json({ error: 'Failed to fetch preferences' });
+    }
+});
+
+app.post('/user/preferences', auth, async (req, res) => {
+    try {
+        const { dark_mode, auto_save, show_tooltips, default_team, notification_settings } = req.body;
+        
+        await db('user_preferences')
+            .insert({
+                user_id: req.user.id,
+                dark_mode: !!dark_mode,
+                auto_save: !!auto_save,
+                show_tooltips: !!show_tooltips,
+                default_team,
+                notification_settings: JSON.stringify(notification_settings || {}),
+                updated_at: db.fn.now()
+            })
+            .onConflict('user_id')
+            .merge({
+                dark_mode: !!dark_mode,
+                auto_save: !!auto_save,
+                show_tooltips: !!show_tooltips,
+                default_team,
+                notification_settings: JSON.stringify(notification_settings || {}),
+                updated_at: db.fn.now()
+            });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating preferences:', err.message);
+        res.status(500).json({ error: 'Failed to update preferences' });
+    }
+});
+
+// Onboarding endpoints
+app.get('/user/onboarding', auth, async (req, res) => {
+    try {
+        const progress = await db('onboarding_progress')
+            .where('user_id', req.user.id)
+            .first();
+        
+        res.json(progress || {
+            tutorial_completed: false,
+            completed_steps: []
+        });
+    } catch (err) {
+        console.error('Error fetching onboarding progress:', err.message);
+        res.status(500).json({ error: 'Failed to fetch onboarding progress' });
+    }
+});
+
+app.post('/user/onboarding/step', auth, async (req, res) => {
+    try {
+        const { step_id } = req.body;
+        
+        if (!step_id) {
+            return res.status(400).json({ error: 'Step ID is required' });
+        }
+
+        const existing = await db('onboarding_progress')
+            .where('user_id', req.user.id)
+            .first();
+
+        if (existing) {
+            const completedSteps = JSON.parse(existing.completed_steps || '[]');
+            if (!completedSteps.includes(step_id)) {
+                completedSteps.push(step_id);
+            }
+            
+            await db('onboarding_progress')
+                .where('user_id', req.user.id)
+                .update({
+                    completed_steps: JSON.stringify(completedSteps),
+                    updated_at: db.fn.now()
+                });
+        } else {
+            await db('onboarding_progress').insert({
+                user_id: req.user.id,
+                completed_steps: JSON.stringify([step_id])
+            });
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating onboarding step:', err.message);
+        res.status(500).json({ error: 'Failed to update onboarding step' });
     }
 });
 
