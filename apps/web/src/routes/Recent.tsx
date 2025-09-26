@@ -9,6 +9,10 @@ type Story = {
     description: string; 
     labels: string[]; 
     complexity_score: number;
+    story_points?: number;
+    estimated_hours?: number;
+    story_type?: string;
+    confidence_level?: string;
     estimation_type: string;
     team: string;
     module: string;
@@ -121,29 +125,87 @@ export default function Recent() {
             {error && <p style={{ color: 'red' }}>{error}</p>}
             
             {/* Search and Filters */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', 
+                gap: 12, 
+                marginBottom: 20,
+                alignItems: 'center'
+            }}>
                 <input 
-                    placeholder="Search stories..." 
+                    placeholder="🔍 Search stories..." 
                     value={search} 
-                    onChange={e => { setPage(1); setSearch(e.target.value) }} 
+                    onChange={e => { setPage(1); setSearch(e.target.value) }}
+                    style={{
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text)'
+                    }}
                 />
-                <select value={filters.team} onChange={e => updateFilter('team', e.target.value)}>
-                    <option value="">All Teams</option>
+                <select 
+                    value={filters.team} 
+                    onChange={e => updateFilter('team', e.target.value)}
+                    style={{
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text)'
+                    }}
+                >
+                    <option value="">👥 All Teams</option>
                     {TEAMS.map(team => <option key={team} value={team}>{team}</option>)}
                 </select>
-                <select value={filters.estimationType} onChange={e => updateFilter('estimationType', e.target.value)}>
-                    <option value="">All Types</option>
+                <select 
+                    value={filters.estimationType} 
+                    onChange={e => updateFilter('estimationType', e.target.value)}
+                    style={{
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text)'
+                    }}
+                >
+                    <option value="">📊 All Types</option>
                     <option value="story">Story-level</option>
                     <option value="module">Module-level</option>
                 </select>
-                <select value={filters.priority} onChange={e => updateFilter('priority', e.target.value)}>
-                    <option value="">All Priorities</option>
+                <select 
+                    value={filters.priority} 
+                    onChange={e => updateFilter('priority', e.target.value)}
+                    style={{
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text)'
+                    }}
+                >
+                    <option value="">⚡ All Priorities</option>
                     {PRIORITIES.map((priority, index) => (
                         <option key={index} value={index + 1}>{priority}</option>
                     ))}
                 </select>
-                <select value={filters.status} onChange={e => updateFilter('status', e.target.value)}>
-                    <option value="">All Statuses</option>
+                <select 
+                    value={filters.status} 
+                    onChange={e => updateFilter('status', e.target.value)}
+                    style={{
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text)'
+                    }}
+                >
+                    <option value="">📋 All Statuses</option>
                     {STATUSES.map(status => (
                         <option key={status} value={status}>
                             {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
@@ -163,37 +225,67 @@ export default function Recent() {
                             background: 'var(--card-bg)',
                             transition: 'all 0.2s ease'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                        <strong>#{s.id} {s.summary}</strong>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                        <strong style={{ fontSize: '16px' }}>#{s.id} {s.summary}</strong>
                                         <span style={{ 
                                             fontSize: '10px', 
                                             padding: '2px 6px', 
                                             borderRadius: '4px',
                                             background: s.estimation_type === 'module' ? 'var(--accent)' : 'var(--primary)',
-                                            color: 'white'
+                                            color: 'white',
+                                            fontWeight: '600'
                                         }}>
                                             {s.estimation_type?.toUpperCase() || 'STORY'}
                                         </span>
+                                        {s.status === 'estimated' && (
+                                            <span style={{ 
+                                                fontSize: '10px', 
+                                                padding: '2px 6px', 
+                                                borderRadius: '4px',
+                                                background: '#10b981',
+                                                color: 'white',
+                                                fontWeight: '600'
+                                            }}>
+                                                ✅ ESTIMATED
+                                            </span>
+                                        )}
                                     </div>
-                                    <div style={{ display: 'flex', gap: 12, fontSize: '12px', color: 'var(--muted)' }}>
-                                        {s.team && <span>Team: {s.team}</span>}
-                                        {s.module && <span>Module: {s.module}</span>}
-                                        <span style={{ color: getPriorityColor(s.priority) }}>
-                                            {getPriorityLabel(s.priority)}
+                                    
+                                    {/* Estimation Details */}
+                                    <div style={{ 
+                                        background: 'rgba(108, 140, 255, 0.1)', 
+                                        padding: '8px 12px', 
+                                        borderRadius: '6px', 
+                                        marginBottom: '8px',
+                                        border: '1px solid rgba(108, 140, 255, 0.2)'
+                                    }}>
+                                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--primary)', marginBottom: '4px' }}>
+                                            📊 Estimated: {s.estimated_hours || 8} hours ({s.story_points || 1} story points)
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                                            🎯 Type: {s.story_type || 'general'} | Confidence: {s.confidence_level || 'medium'}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 12, fontSize: '12px', color: 'var(--muted)', flexWrap: 'wrap' }}>
+                                        {s.team && <span>👥 Team: {s.team}</span>}
+                                        {s.module && <span>📦 Module: {s.module}</span>}
+                                        <span style={{ color: getPriorityColor(s.priority), fontWeight: '600' }}>
+                                            ⚡ {getPriorityLabel(s.priority)}
                                         </span>
-                                        <span style={{ color: getStatusColor(s.status) }}>
-                                            {s.status?.replace('_', ' ').toUpperCase() || 'ESTIMATED'}
+                                        <span style={{ color: getStatusColor(s.status), fontWeight: '600' }}>
+                                            📋 {s.status?.replace('_', ' ').toUpperCase() || 'ESTIMATED'}
                                         </span>
                                     </div>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--accent)' }}>
+                                <div style={{ textAlign: 'right', minWidth: '80px' }}>
+                                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent)' }}>
                                         {s.complexity_score}
                                     </div>
                                     <div style={{ fontSize: '10px', color: 'var(--muted)' }}>
-                                        Complexity
+                                        Complexity Score
                                     </div>
                                 </div>
                             </div>

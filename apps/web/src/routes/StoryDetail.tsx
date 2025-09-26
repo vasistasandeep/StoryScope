@@ -10,6 +10,23 @@ type Story = {
     description: string; 
     labels: string[]; 
     complexity_score: number; 
+    story_points?: number;
+    estimated_hours?: number;
+    story_type?: string;
+    confidence_level?: string;
+    baseline_reference?: {
+        type: string;
+        hours: number;
+        description: string;
+    };
+    analysis?: {
+        token_count: number;
+        uncertainty_factor: number;
+        technical_factor: number;
+        team_factor: number;
+        priority_factor: number;
+        story_type_factor: number;
+    };
     estimation_type: string;
     team: string;
     module: string;
@@ -182,11 +199,51 @@ export default function StoryDetail() {
             }}>
                 <h2 style={{ marginTop: 0 }}>{story.summary}</h2>
                 
+                {/* Enhanced Estimation Summary */}
+                <div style={{ 
+                    background: 'rgba(108, 140, 255, 0.1)', 
+                    padding: '16px', 
+                    borderRadius: '8px', 
+                    marginBottom: '20px',
+                    border: '1px solid rgba(108, 140, 255, 0.2)'
+                }}>
+                    <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--primary)', marginBottom: '12px' }}>
+                        ✅ Story estimated successfully!
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--primary)', marginBottom: '8px' }}>
+                        📊 Estimated: {story.estimated_hours || 8} hours ({story.story_points || 1} story points)
+                    </div>
+                    <div style={{ fontSize: '14px', color: 'var(--muted)', marginBottom: '12px' }}>
+                        🎯 Type: {story.story_type || 'general'} | Confidence: {story.confidence_level || 'medium'}
+                    </div>
+                    
+                    {story.baseline_reference && (
+                        <div style={{ fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                            📋 Baseline: {story.baseline_reference.description} ({story.baseline_reference.hours} hours)
+                        </div>
+                    )}
+                </div>
+
+                {/* Detailed Metrics */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
                     <div>
-                        <strong>Estimated Complexity:</strong>
+                        <strong>Complexity Score:</strong>
                         <div style={{ fontSize: '24px', color: 'var(--accent)', fontWeight: '700' }}>
                             {story.complexity_score}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <strong>Story Points:</strong>
+                        <div style={{ fontSize: '24px', color: 'var(--primary)', fontWeight: '700' }}>
+                            {story.story_points || 1}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <strong>Estimated Hours:</strong>
+                        <div style={{ fontSize: '24px', color: 'var(--accent)', fontWeight: '700' }}>
+                            {story.estimated_hours || 8}h
                         </div>
                     </div>
                     
@@ -194,7 +251,7 @@ export default function StoryDetail() {
                         <div>
                             <strong>Actual Effort:</strong>
                             <div style={{ fontSize: '24px', color: 'var(--primary)', fontWeight: '700' }}>
-                                {story.actual_effort}
+                                {story.actual_effort}h
                             </div>
                         </div>
                     )}
@@ -219,6 +276,39 @@ export default function StoryDetail() {
                         </div>
                     </div>
                 </div>
+
+                {/* Calculation Breakdown */}
+                {story.analysis && (
+                    <div style={{ 
+                        background: 'var(--card-bg)', 
+                        border: '1px solid var(--border)', 
+                        borderRadius: '8px', 
+                        padding: '16px', 
+                        marginBottom: '16px' 
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>📊 Calculation Breakdown</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: '14px' }}>
+                            <div>
+                                <strong>Word Count:</strong> {story.analysis.token_count}
+                            </div>
+                            <div>
+                                <strong>Team Factor:</strong> {story.analysis.team_factor}x
+                            </div>
+                            <div>
+                                <strong>Priority Factor:</strong> {story.analysis.priority_factor}x
+                            </div>
+                            <div>
+                                <strong>Story Type Factor:</strong> {story.analysis.story_type_factor}x
+                            </div>
+                            <div>
+                                <strong>Technical Complexity:</strong> {story.analysis.technical_factor}
+                            </div>
+                            <div>
+                                <strong>Uncertainty Factor:</strong> {story.analysis.uncertainty_factor}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {story.description && (
                     <div style={{ marginBottom: 16 }}>

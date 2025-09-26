@@ -1,25 +1,24 @@
 # Story Scope - High-Level Design Document
 
-{panel:title=Document Information|borderStyle=dashed|borderColor=#ccc|titleBGColor=#f7f7f7|bgColor=#ffffce}
-**Version:** 2.0  
-**Date:** September 27, 2025  
-**Document Owner:** Engineering Team  
-**Status:** Active Development  
-**Last Updated:** {date}
-{panel}
+## Document Information
+| Field | Value |
+|-------|-------|
+| **Version** | 2.0 |
+| **Date** | September 27, 2025 |
+| **Document Owner** | Engineering Team |
+| **Status** | Active Development |
+| **Last Updated** | September 27, 2025 |
 
 ---
 
 ## 🏗️ System Architecture Overview
 
 ### Architecture Principles
-{panel:title=Design Principles|borderColor=#36B37E|titleBGColor=#E3FCEF}
-🎯 **Scalability:** Horizontal scaling with microservices architecture  
-🔒 **Security:** Defense in depth with multiple security layers  
-⚡ **Performance:** Sub-200ms API response times  
-🔄 **Reliability:** 99.9% uptime with automated failover  
-🧩 **Modularity:** Loosely coupled components for maintainability
-{panel}
+- 🎯 **Scalability:** Horizontal scaling with microservices architecture  
+- 🔒 **Security:** Defense in depth with multiple security layers  
+- ⚡ **Performance:** Sub-200ms API response times  
+- 🔄 **Reliability:** 99.9% uptime with automated failover  
+- 🧩 **Modularity:** Loosely coupled components for maintainability
 
 ### High-Level System Diagram
 
