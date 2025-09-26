@@ -42,40 +42,39 @@ if (useSQLite) {
         client: "pg",
         connection: {
             connectionString: connectionString,
-            ssl: { rejectUnauthorized: false }
+            ssl: isRailway ? { rejectUnauthorized: false } : false
         },
         pool: {
-            min: 1,
-            max: 3,
-            createTimeoutMillis: 30000,
-            acquireTimeoutMillis: 60000,
-            idleTimeoutMillis: 30000,
+            min: 0,
+            max: 1,
+            createTimeoutMillis: 10000,
+            acquireTimeoutMillis: 10000,
+            idleTimeoutMillis: 10000,
             reapIntervalMillis: 1000,
-            createRetryIntervalMillis: 2000,
+            createRetryIntervalMillis: 1000,
             propagateCreateError: false
         },
-        migrations: {
-            tableName: 'knex_migrations'
-        },
-        acquireConnectionTimeout: 60000
+        acquireConnectionTimeout: 10000
     });
 }
 
 // Add connection testing with retry logic
-const testConnection = async (retries = 3) => {
+const testConnection = async (retries = 2) => {
     for (let i = 0; i < retries; i++) {
         try {
+            console.log(`🔄 Testing database connection (attempt ${i + 1}/${retries})...`);
             await db.raw('SELECT 1');
             console.log('✅ Database connection successful');
             return;
         } catch (error) {
             console.error(`❌ Database connection attempt ${i + 1} failed:`, error.message);
             if (i === retries - 1) {
-                console.error('🔥 All connection attempts failed');
+                console.error('🔥 All database connection attempts failed');
                 throw error;
             }
             // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log('⏳ Waiting 3 seconds before retry...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
         }
     }
 };
