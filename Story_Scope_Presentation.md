@@ -1,7 +1,7 @@
 # Story Scope - Management Presentation
 ## AI-Powered Story Estimation Platform
 
-**Presented by:** [Your Name]  
+**Presented by:** Vasista Sandeep 
 **Date:** September 27, 2025  
 **Version:** 2.0 - Production Ready
 
