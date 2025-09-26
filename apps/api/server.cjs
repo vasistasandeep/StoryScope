@@ -666,11 +666,18 @@ app.get("/", (req, res) => {
     return res.json({ service: "api", status: "ok" });
 });
 
-// SPA fallback for client-side routes (only when UI is built) and not for asset files
+// SPA fallback for client-side routes (only when UI is built) and not for asset files or API routes
 if (hasBuiltUI) {
     app.get("*", (req, res, next) => {
         const requestedExtension = path.extname(req.path);
+        // Don't serve SPA for asset files
         if (requestedExtension) return next();
+        
+        // Don't serve SPA for API routes - let them return proper 404/405 errors
+        const apiRoutes = ['/estimate', '/stories', '/stats', '/auth', '/admin', '/health', '/report.csv', '/jira', '/user'];
+        const isApiRoute = apiRoutes.some(route => req.path.startsWith(route));
+        if (isApiRoute) return next();
+        
         return res.sendFile(path.join(uiDir, "index.html"));
     });
 }
